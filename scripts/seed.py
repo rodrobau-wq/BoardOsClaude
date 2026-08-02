@@ -39,7 +39,7 @@ def main() -> None:
         ).fetchone()[0]
         conn.execute(
             "INSERT INTO platform.assinatura (tenant_id, plano, base_mensal_cent, preco_por_1k_cent) "
-            "VALUES (%s,'v0',49900,900) ON CONFLICT DO NOTHING",
+            "VALUES (%s,'v0',49900,900) ON CONFLICT (tenant_id) DO NOTHING",
             (tid,),
         )
         # 2) dim_calendario

@@ -38,7 +38,7 @@ def main() -> None:
         ).fetchone()[0]
         conn.execute(
             "INSERT INTO platform.assinatura (tenant_id, plano, base_mensal_cent, preco_por_1k_cent) "
-            "VALUES (%s,'v0',49900,900) ON CONFLICT DO NOTHING", (tid,))
+            "VALUES (%s,'v0',49900,900) ON CONFLICT (tenant_id) DO NOTHING", (tid,))
         with conn.cursor() as cur:
             n = upsert_into(cur, DE, ATE)
     print(f"tenant={tid}  calendário={n} dias")
