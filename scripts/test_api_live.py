@@ -22,6 +22,7 @@ _ok = _fail = 0
 
 def check(nome, cond, extra=""):
     global _ok, _fail
+    cond = bool(cond)
     status = "ok " if cond else "FAIL"
     print(f"  [{status}] {nome}" + (f" — {extra}" if extra else ""))
     _ok += cond
