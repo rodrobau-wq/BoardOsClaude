@@ -71,7 +71,7 @@ def onboard_empresas_csv(path: str, admin_dsn: str, mapping: Dict = None) -> Dic
         for row in _read(path):
             ext = str(row[m["id_externo"]]).strip()
             nome = str(row[m["nome"]]).strip()
-            slug = slugify(nome) + "-" + ext[-4:]
+            slug = slugify(ext)  # slug ESTÁVEL pelo id do CRM: renomear atualiza, não duplica
             tid = conn.execute(
                 "INSERT INTO platform.tenant (nome, slug, status) VALUES (%s,%s,'ativo') "
                 "ON CONFLICT (slug) DO UPDATE SET nome=EXCLUDED.nome RETURNING id",

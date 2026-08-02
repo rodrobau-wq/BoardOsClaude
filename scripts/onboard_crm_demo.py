@@ -59,6 +59,13 @@ def gen_vendas(perfil, salt):
 
 
 def main():
+    # 0) limpeza (DEMO): remove tenants fora da lista atual do CRM (dupes/órfãos).
+    #    Converge para exatamente as empresas do CRM. Só para a fase demo.
+    alvo = [crm.slugify(ext) for ext in PERFIS]
+    with psycopg.connect(ADMIN_DSN, autocommit=True) as conn:
+        n = conn.execute("DELETE FROM platform.tenant WHERE slug <> ALL(%s)", (alvo,)).rowcount
+    print(f"limpeza: {n} tenant(s) fora da lista do CRM removido(s)")
+
     # 1) empresas -> tenants
     idmap = crm.onboard_empresas_csv(os.path.join(ROOT, "data", "crm_empresas_exemplo.csv"), ADMIN_DSN)
     print("empresas -> tenants:", idmap)
