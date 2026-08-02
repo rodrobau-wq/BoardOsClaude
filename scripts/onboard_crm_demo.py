@@ -28,16 +28,17 @@ from boardos.auth import hash_password  # noqa: E402
 
 SENHA_DEMO = "demo1234"
 
-# OKRs demo (varejo). (titulo, periodo) -> lista de KRs (titulo, unidade, meta, atual, base, direcao)
+# OKRs demo (varejo). KR: (titulo, unidade, meta, atual, base, direcao, fonte)
+# fonte != None => "atual" vem do dado real (calculado pela API), não do seed.
 OKRS_DEMO = [
     ("Crescer com rentabilidade em 2026", "2026", [
-        ("Faturamento +8% no ano", "%", 8, 5.5, 0, "up"),
-        ("Margem bruta ≥ 22%", "%", 22, 21.4, 20, "up"),
-        ("Ruptura ≤ 3%", "%", 3, 4.8, 6, "down"),
+        ("Faturamento +8% no ano", "%", 8, 0, 0, "up", "fat_yoy_pct"),
+        ("Margem bruta ≥ 22%", "%", 22, 21.4, 20, "up", None),
+        ("Ruptura ≤ 3%", "%", 3, 4.8, 6, "down", None),
     ]),
     ("Fidelizar o cliente", "2026", [
-        ("Base fidelidade +15 mil", "clientes", 15000, 10600, 0, "up"),
-        ("Ticket médio +5%", "%", 5, 3.4, 0, "up"),
+        ("Base fidelidade +15 mil", "clientes", 15000, 10600, 0, "up", None),
+        ("Ticket médio +5%", "%", 5, 0, 0, "up", "ticket_yoy_pct"),
     ]),
 ]
 
@@ -50,11 +51,11 @@ def seed_okrs(tenant_id: str) -> None:
                 "INSERT INTO okr_objetivo (tenant_id, titulo, periodo, ordem) "
                 "VALUES (%s,%s,%s,%s) RETURNING id",
                 (tenant_id, titulo, periodo, o_ordem)).fetchone()[0]
-            for k_ordem, (kt, un, meta, atual, base, direcao) in enumerate(krs):
+            for k_ordem, (kt, un, meta, atual, base, direcao, fonte) in enumerate(krs):
                 cur.execute(
-                    "INSERT INTO okr_kr (tenant_id, objetivo_id, titulo, unidade, meta, atual, base, direcao, ordem) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (tenant_id, oid, kt, un, meta, atual, base, direcao, k_ordem))
+                    "INSERT INTO okr_kr (tenant_id, objetivo_id, titulo, unidade, meta, atual, base, direcao, ordem, fonte) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (tenant_id, oid, kt, un, meta, atual, base, direcao, k_ordem, fonte))
 
 ADMIN_DSN = (os.environ.get("BOARDOS_ADMIN_DSN") or os.environ.get("DATABASE_URL")
              or "postgresql://boardos_admin:change-me-admin@localhost:5432/boardos")
@@ -115,7 +116,7 @@ def main():
         seed_okrs(tid)
         print(f"  {ext} ({tid}): {res['linhas']} linhas de gold + OKRs demo")
 
-    # 4) usuários de login (senha com hash) — um CEO por empresa
+    # 4) usuários de login (senha com hash) — um CEO por empresa + super-admin
     with psycopg.connect(ADMIN_DSN, autocommit=True) as conn:
         for ext, perfil in PERFIS.items():
             tid = idmap.get(ext)
@@ -131,10 +132,22 @@ def main():
                 """,
                 (perfil["email"], hash_password(SENHA_DEMO), "CEO", tid),
             )
+        # super-admin da plataforma: acesso a todas as bases (tenant NULL)
+        conn.execute(
+            """
+            INSERT INTO platform.usuario_login (email, senha_hash, nome, tenant_id, papel)
+            VALUES (%s,%s,%s,NULL,'super_admin')
+            ON CONFLICT (email) DO UPDATE SET
+              senha_hash=EXCLUDED.senha_hash, tenant_id=NULL,
+              nome=EXCLUDED.nome, papel='super_admin'
+            """,
+            ("rodrobau@gmail.com", hash_password(SENHA_DEMO), "Rodrigo (Admin)"),
+        )
 
     print("\nOK — logins demo (senha: %s):" % SENHA_DEMO)
     for ext, perfil in PERFIS.items():
         print("   %-22s %s" % (perfil["email"], ext))
+    print("   %-22s %s" % ("rodrobau@gmail.com", "SUPER-ADMIN (todas as bases)"))
 
 
 if __name__ == "__main__":

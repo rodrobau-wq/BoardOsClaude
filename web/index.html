@@ -94,6 +94,14 @@
     border-radius:9px;padding:11px 12px;font:14px var(--font)}
   .login-card .btn{padding:11px;text-align:center;font-size:14px}
   .login-card .err{color:var(--crit);font-size:12.5px;min-height:16px}
+  table.tbl{border-collapse:collapse;width:100%;font-size:13px}
+  .tbl th,.tbl td{padding:10px 12px;text-align:right;white-space:nowrap}
+  .tbl th:first-child,.tbl td:first-child{text-align:left}
+  .tbl thead th{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.4px;border-bottom:1px solid var(--border)}
+  .tbl tbody tr{border-bottom:1px solid var(--border)}
+  .tbl tbody tr:last-child{border-bottom:0}
+  .tbl td{font-variant-numeric:tabular-nums}
   .msg{padding:16px;border-radius:12px;font-size:13.5px}
   .msg.err{background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit)}
   .msg.info{background:var(--accent-soft);color:var(--accent-strong)}
@@ -105,6 +113,7 @@
   <div class="logo">B</div>
   <div><b>BoardOS</b><small id="tenantNome">Painel Estratégico</small></div>
   <div class="cfg hide" id="cfg">
+    <select id="empresa" class="hide"></select>
     <input id="ano" class="mini num" value="2026">
     <input id="mes" class="mini num" value="8">
     <button class="btn" id="load">Carregar</button>
@@ -120,7 +129,8 @@
     <input id="senha" type="password" placeholder="senha" autocomplete="current-password">
     <button class="btn" id="entrar">Entrar</button>
     <div class="err" id="loginErr"></div>
-    <div class="hint">Demo: <b>ceo@aurora.demo</b> · ceo@belavista.demo · ceo@maxpreco.demo — senha <b>demo1234</b></div>
+    <div class="hint">Demo: <b>ceo@aurora.demo</b> · ceo@belavista.demo · ceo@maxpreco.demo<br>
+      Admin da plataforma: <b>rodrobau@gmail.com</b> — senha <b>demo1234</b></div>
   </div>
 
   <div id="status" class="msg info hide">Clique <b>Carregar</b>.</div>
@@ -163,6 +173,16 @@
     </section>
 
     <section class="card">
+      <header><h2>Lojas</h2><span class="sub">drill-down do mês</span></header>
+      <div class="body" style="overflow-x:auto">
+        <table class="tbl" id="lojasTbl">
+          <thead><tr><th>Loja</th><th>Faturamento</th><th>vs. ano ant. — Civil</th><th>vs. ano ant. — Varejo</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
       <header><h2>Metas (OKRs)</h2><span class="sub">2026</span></header>
       <div class="body" id="okrs"></div>
     </section>
@@ -197,13 +217,20 @@ function brl(v){return "R$ "+(v/1000).toLocaleString("pt-BR",{maximumFractionDig
 function el(id){return document.getElementById(id);}
 
 async function jget(path){
-  var r = await fetch(API+path, {headers:{"Authorization":"Bearer "+TOKEN}});
+  var h = {"Authorization":"Bearer "+TOKEN};
+  var emp = el("empresa");
+  if(!emp.classList.contains("hide") && emp.value) h["X-Tenant-Id"] = emp.value;
+  var r = await fetch(API+path, {headers:h});
   if(r.status===401){ logout("Sessão expirada. Entre novamente."); throw new Error("401"); }
   if(!r.ok){var t=await r.text(); throw new Error("HTTP "+r.status+" — "+t);}
   return r.json();
 }
 
 async function load(){
+  var emp = el("empresa");
+  if(!emp.classList.contains("hide") && !emp.value){
+    setStatus("Escolha a <b>empresa</b> no seletor para carregar os dados.", "info"); return;
+  }
   var ano = +el("ano").value, mes = +el("mes").value;
   setStatus("Carregando…", "info");
   try{
@@ -218,6 +245,8 @@ async function load(){
     render();
     try{ var ok = await jget("/okrs"); renderOkrs(ok.objetivos); }
     catch(_){ el("okrs").innerHTML='<span class="hint">Sem metas cadastradas.</span>'; }
+    try{ var lr = await jget("/lojas/resumo?ano="+ano+"&mes="+mes); renderLojas(lr.lojas); }
+    catch(_){ renderLojas([]); }
     el("content").classList.remove("hide");
     setStatus("", "hide");
   }catch(e){
@@ -271,6 +300,23 @@ function render(){
   });
 
   drawChart();
+}
+
+function renderLojas(lojas){
+  var tb = el("lojasTbl").querySelector("tbody");
+  if(!lojas || !lojas.length){
+    tb.innerHTML = '<tr><td colspan="4" class="hint">Sem dados de loja no período.</td></tr>'; return;
+  }
+  function delta(v){
+    if(v==null) return '<span class="hint">—</span>';
+    var cls = v>=0 ? "pg" : "pr";
+    var arrow = v>=0 ? "▲" : "▼";
+    return '<span class="'+cls+'" style="font-weight:600">'+arrow+" "+pct(v)+"</span>";
+  }
+  tb.innerHTML = lojas.map(function(l){
+    return "<tr><td>"+l.nome+"</td><td>"+brl(l.faturamento)+"</td>"+
+           "<td>"+delta(l.var_civil)+"</td><td>"+delta(l.var_ajustada)+"</td></tr>";
+  }).join("");
 }
 
 function renderOkrs(objetivos){
@@ -357,21 +403,40 @@ async function entrar(){
       el("loginErr").textContent = (t.detail || "Falha no login") + "."; return; }
     var j = await r.json();
     setToken(j.token);
-    showApp(j.tenant.nome);
-    load();
+    enterApp(j.user.papel, j.tenant);
   }catch(e){ el("loginErr").textContent = "Erro de conexão (o serviço pode estar acordando). Tente de novo."; }
+}
+
+async function enterApp(papel, tenant){
+  var emp = el("empresa");
+  if(papel === "super_admin"){
+    showApp("Administração da Plataforma");
+    emp.classList.remove("hide");
+    emp.innerHTML = '<option value="">— carregando empresas… —</option>';
+    try{
+      var r = await jget("/tenants");
+      emp.innerHTML = '<option value="">— escolha a empresa —</option>' +
+        r.tenants.map(function(t){return '<option value="'+t.id+'">'+t.nome+'</option>';}).join("");
+      setStatus("Você é <b>admin da plataforma</b>: escolha a empresa para navegar a base dela.", "info");
+    }catch(e){ emp.innerHTML = '<option value="">(erro ao listar empresas)</option>'; }
+  } else {
+    emp.classList.add("hide");
+    showApp(tenant ? tenant.nome : "—");
+    load();
+  }
 }
 
 async function boot(){
   if(!TOKEN){ showLogin(); return; }
-  try{ var me = await jget("/me"); showApp(me.tenant.nome); load(); }
+  try{ var me = await jget("/me"); enterApp(me.user.papel, me.tenant); }
   catch(e){ /* jget trata 401 → volta ao login */ }
 }
 
 el("entrar").addEventListener("click", entrar);
 el("senha").addEventListener("keydown", function(e){ if(e.key==="Enter") entrar(); });
-el("logout").addEventListener("click", function(){ logout(); });
+el("logout").addEventListener("click", function(){ el("empresa").classList.add("hide"); logout(); });
 el("load").addEventListener("click", load);
+el("empresa").addEventListener("change", function(){ if(el("empresa").value) load(); });
 Array.prototype.forEach.call(document.querySelectorAll("#seg button"), function(b){
   b.addEventListener("click", function(){ lens=b.getAttribute("data-l");
     Array.prototype.forEach.call(document.querySelectorAll("#seg button"),function(x){x.classList.toggle("on",x===b);});
