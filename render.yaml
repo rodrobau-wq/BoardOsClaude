@@ -33,3 +33,15 @@ services:
           property: connectionString
       - key: PYTHON_VERSION
         value: "3.11.9"
+
+  # Painel visual (static site, free) — consome a API acima.
+  - type: web
+    name: boardos-painel
+    runtime: static
+    branch: main
+    buildCommand: echo "sem build (HTML estático)"
+    staticPublishPath: ./web
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

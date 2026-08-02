@@ -16,10 +16,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import date  # noqa: E402
 
 from fastapi import FastAPI, Header, HTTPException  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from boardos.db import tenant_session  # noqa: E402
 from boardos import comparison  # noqa: E402
 
-app = FastAPI(title="BoardOS API", version="0.1.0-m1")
+app = FastAPI(title="BoardOS API", version="0.2.0-m2")
+
+# CORS: permite o painel (static site) chamar a API de outro endereço.
+# Aberto no MVP; restringir aos domínios do painel quando for para produção.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 
 def _gold_mes(cur, ano: int, mes: int):
