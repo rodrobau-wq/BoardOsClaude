@@ -31,9 +31,9 @@
     color:#fff;display:grid;place-items:center;font-weight:700}
   header b{font-size:15px}header small{display:block;color:var(--muted);font-size:11px}
   .cfg{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  .cfg input{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;
+  .cfg input,.cfg select{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;
     padding:7px 9px;font:13px var(--font)}
-  .cfg input#tenant{width:290px}.cfg input.mini{width:64px}
+  .cfg #tenant{min-width:230px}.cfg input.mini{width:64px}
   .btn{all:unset;cursor:pointer;background:var(--accent);color:#fff;font-weight:600;font-size:13px;
     padding:8px 14px;border-radius:8px}.btn:hover{background:var(--accent-strong)}
   .wrap{padding:20px 22px 48px;max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
@@ -84,7 +84,7 @@
   <div class="logo">B</div>
   <div><b>BoardOS</b><small>Painel Estratégico · dado ao vivo</small></div>
   <div class="cfg">
-    <input id="tenant" placeholder="X-Tenant-Id (cole o UUID do seed)">
+    <select id="tenant"><option value="">— carregando empresas… —</option></select>
     <input id="ano" class="mini num" value="2026">
     <input id="mes" class="mini num" value="8">
     <button class="btn" id="load">Carregar</button>
@@ -92,7 +92,7 @@
 </header>
 
 <div class="wrap">
-  <div id="status" class="msg info">Cole o <b>Tenant ID</b> (o UUID que o seed imprimiu) e clique <b>Carregar</b>.</div>
+  <div id="status" class="msg info">Escolha a <b>empresa</b> no seletor acima e clique <b>Carregar</b>.</div>
 
   <div id="content" class="hide">
     <!-- hero civil vs varejo -->
@@ -271,14 +271,31 @@ function drawChart(){
   svg.appendChild(line(A,{stroke:Cac,"stroke-width":3,"stroke-linecap":"round","stroke-linejoin":"round"}));
 }
 
+async function loadTenants(){
+  var sel = el("tenant");
+  try{
+    var r = await fetch(API+"/tenants");
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    var j = await r.json();
+    if(!j.tenants.length){ sel.innerHTML='<option value="">(nenhuma empresa — rode o onboarding)</option>'; return; }
+    sel.innerHTML = '<option value="">— escolha a empresa —</option>' +
+      j.tenants.map(function(t){return '<option value="'+t.id+'">'+t.nome+'</option>';}).join("");
+  }catch(e){
+    sel.innerHTML='<option value="">(API acordando… clique Carregar de novo)</option>';
+    setStatus("Não consegui listar as empresas ("+e.message+"). O serviço grátis pode estar acordando — aguarde uns segundos e recarregue.", "info");
+  }
+}
+
 el("load").addEventListener("click", load);
-el("tenant").addEventListener("keydown", function(e){ if(e.key==="Enter") load(); });
+el("tenant").addEventListener("change", function(){ if(el("tenant").value) load(); });
 Array.prototype.forEach.call(document.querySelectorAll("#seg button"), function(b){
   b.addEventListener("click", function(){ lens=b.getAttribute("data-l");
     Array.prototype.forEach.call(document.querySelectorAll("#seg button"),function(x){x.classList.toggle("on",x===b);});
     if(last) render();
   });
 });
+
+loadTenants();
 </script>
 </body>
 </html>

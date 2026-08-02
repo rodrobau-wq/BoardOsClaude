@@ -17,7 +17,7 @@ from datetime import date  # noqa: E402
 
 from fastapi import FastAPI, Header, HTTPException  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from boardos.db import tenant_session  # noqa: E402
+from boardos.db import tenant_session, platform_session  # noqa: E402
 from boardos import comparison  # noqa: E402
 
 app = FastAPI(title="BoardOS API", version="0.2.0-m2")
@@ -55,6 +55,20 @@ def _gold_mes(cur, ano: int, mes: int):
 @app.get("/health")
 def health():
     return {"ok": True, "service": "boardos", "stage": "M0"}
+
+
+@app.get("/tenants")
+def tenants():
+    """Lista as empresas (tenants) para o seletor do painel.
+
+    Em produção: proteger por auth de super-admin. Aqui alimenta o dropdown do
+    painel (MVP). Cada empresa do CRM vira um tenant.
+    """
+    with platform_session() as cur:
+        cur.execute("SELECT id, nome, slug, status FROM platform.tenant ORDER BY nome")
+        rows = [{"id": str(r[0]), "nome": r[1], "slug": r[2], "status": r[3]}
+                for r in cur.fetchall()]
+    return {"tenants": rows}
 
 
 @app.get("/kpi/diario")

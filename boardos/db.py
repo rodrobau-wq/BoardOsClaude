@@ -27,6 +27,25 @@ def connect():
 
 
 @contextmanager
+def platform_session():
+    """Conexão para tabelas de plataforma (platform.*), que NÃO têm RLS de tenant.
+
+    Uso: listar/gerir tenants, billing, etc. Em produção, proteger por auth de
+    super-admin — aqui é usado pelo seletor de empresa do painel (MVP).
+    """
+    conn = connect()
+    try:
+        with conn.cursor() as cur:
+            yield cur
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+@contextmanager
 def tenant_session(tenant_id: str):
     """Abre uma conexão já escopada a um tenant (SET app.current_tenant).
 
