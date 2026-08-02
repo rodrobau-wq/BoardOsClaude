@@ -5,7 +5,9 @@
 databases:
   - name: boardos-db
     databaseName: boardos
-    plan: free
+    # plano pago pequeno: o Render só permite UM Postgres free por workspace,
+    # e o free expira em ~30 dias. basic-256mb é o menor pago (~US$6/mês).
+    plan: basic-256mb
     postgresMajorVersion: "16"
 
 services:

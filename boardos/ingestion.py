@@ -82,6 +82,11 @@ def ingest_csv(
                     seq_por_cupom[k] = seq_por_cupom.get(k, 0) + 1
                     r["seq_item"] = seq_por_cupom[k]
 
+                # item sem categoria vai para um balde "GERAL" — assim as linhas
+                # por categoria no gold nunca têm categoria NULL (que é reservado
+                # para a linha de TOTAL da loja).
+                if not r["categoria_codigo"]:
+                    r["categoria_codigo"] = "GERAL"
                 cat_id = None
                 if r["categoria_codigo"]:
                     cat_id = cat_cache.get(r["categoria_codigo"])

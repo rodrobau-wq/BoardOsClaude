@@ -16,30 +16,33 @@ Deploy automático a cada `git push` na branch `main`.
 
 ## Carregar dados de demonstração (opcional)
 
-A API sobe sem dados. Para ver os endpoints com conteúdo, rode o seed uma vez:
+A API sobe sem dados. No serviço `boardos-api` → **Shell**, rode UM dos seeds:
 
-- No serviço `boardos-api` → **Shell** → execute:
+- **Comparação YoY (recomendado)** — ~3 anos no gold, faz `/comparacao/yoy` responder:
+  ```bash
+  python scripts/seed_demo_gold.py
+  ```
+- **Pipeline de item** — cria tenant, calendário e ingere o CSV de exemplo (2 dias):
   ```bash
   python scripts/seed.py
   ```
-  Isso cria o tenant demo, popula o calendário e ingere o CSV de exemplo.
-  Anote o `tenant=<UUID>` impresso. Depois:
-  ```bash
-  curl "https://boardos-api.onrender.com/kpi/diario?data_de=2026-08-01&data_ate=2026-08-31" \
-       -H "X-Tenant-Id: <UUID>"
-  ```
 
-> O `/comparacao/yoy` precisa de histórico de ~2 anos; o CSV de exemplo tem só
-> 2 dias. Para exercitar a comparação no banco, um seed maior (2 anos no grão
-> item) entra num passo seguinte.
+Ambos imprimem o `tenant=<UUID>`. Depois:
+```bash
+curl "https://boardos-api.onrender.com/comparacao/yoy?ano=2026&mes=8" \
+     -H "X-Tenant-Id: <UUID>"
+curl "https://boardos-api.onrender.com/kpi/diario?data_de=2026-08-01&data_ate=2026-08-31" \
+     -H "X-Tenant-Id: <UUID>"
+```
 
-## Ressalvas do free tier
+## Planos e ressalvas
 
-- O web service **dorme** após inatividade (primeira chamada demora a acordar).
-- O Postgres grátis do Render **expira em ~30 dias** — ótimo para testar, não
-  para produção.
-- Se `CREATE EXTENSION postgis` ou `CREATE ROLE` falhar por permissão no plano,
-  ajustamos a migração (é raro; o usuário owner do Render costuma ter privilégio).
+- **Banco:** `basic-256mb` (pago, ~US$6/mês). O Render só permite **um** Postgres
+  free por workspace e o free expira em ~30 dias — por isso o banco é pago.
+- **Web service:** `free` (dorme após inatividade; primeira chamada demora a
+  acordar). Suba para um plano pago quando quiser sem "cold start".
+- Se `CREATE EXTENSION postgis` ou `CREATE ROLE` falhar por permissão,
+  ajustamos a migração (raro; o owner do Render costuma ter privilégio).
 
 ## Sem front-end ainda
 
