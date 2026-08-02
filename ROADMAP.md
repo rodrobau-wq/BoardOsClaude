@@ -11,6 +11,7 @@
 | Motor (M1) | Comparação YoY civil-vs-varejo com ajuste de calendário + testes |
 | Painel (M2) | Painel visual ao vivo, toggle Civil↔Varejo, gráfico alinhado, multiempresa |
 | Plano (M3 parcial) | Metas/OKRs com **edição na tela** (1.1 ✅) e KR automático do dado real |
+| Plano (completo) | **Aba Plano**: Entrevista de Descoberta com resumo IA (1.2 ✅), Direção Estratégica (1.3 ✅), SWOT + Radar de Maturidade (1.4 ✅), Ações 5W2H (1.5 ✅) |
 | Execução | **Ciclo FCA + alertas** calculados do dado real (1.6 ✅) |
 | IA | **Advisor com Claude** + fallback estatístico (2.1 ✅ — ativa ao setar ANTHROPIC_API_KEY no Render) |
 | Operação | **Gestão de usuários** — convites, papéis, troca de senha (4.1 ✅) |
