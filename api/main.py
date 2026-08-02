@@ -21,7 +21,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E
 from pydantic import BaseModel  # noqa: E402
 
 from boardos import advisor, comparison  # noqa: E402
-from boardos.auth import decode_token, make_token, verify_password  # noqa: E402
+from boardos.auth import decode_token, hash_password, make_token, verify_password  # noqa: E402
 from boardos.db import platform_session, tenant_session  # noqa: E402
 
 app = FastAPI(title="BoardOS API", version="0.3.0-auth")
@@ -387,6 +387,115 @@ def lojas_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
     with tenant_session(tid) as cur:
         lojas = _lojas_mes(cur, ano, mes)
     return {"periodo": f"{ano}-{mes:02d}", "lojas": lojas}
+
+
+# ------------------------------------------------- gestão de usuários
+class UsuarioIn(BaseModel):
+    email: str
+    nome: Optional[str] = None
+    papel: str = "estrategico"
+    senha: Optional[str] = None      # obrigatória ao criar; opcional ao editar (reset)
+
+
+PAPEIS_TENANT = ("admin_tenant", "estrategico", "tatico", "operacional")
+
+
+def _admin_do_tenant(user: dict) -> None:
+    if user.get("papel") not in ("super_admin", "admin_tenant"):
+        raise HTTPException(403, "Somente o administrador pode gerir usuários.")
+
+
+@app.get("/usuarios")
+def usuarios_list(user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _admin_do_tenant(user)
+    with platform_session() as cur:
+        cur.execute(
+            "SELECT email, nome, papel, criado_em FROM platform.usuario_login "
+            "WHERE tenant_id = %s ORDER BY criado_em", (tid,))
+        rows = [{"email": r[0], "nome": r[1], "papel": r[2],
+                 "criado_em": str(r[3])} for r in cur.fetchall()]
+    return {"usuarios": rows}
+
+
+@app.post("/usuarios")
+def usuarios_create(body: UsuarioIn, user: dict = Depends(current),
+                    tid: str = Depends(tenant_of)):
+    _admin_do_tenant(user)
+    if body.papel not in PAPEIS_TENANT:
+        raise HTTPException(400, "Papel inválido.")
+    if not body.senha or len(body.senha) < 8:
+        raise HTTPException(400, "Defina uma senha inicial com pelo menos 8 caracteres.")
+    email = body.email.strip().lower()
+    if "@" not in email:
+        raise HTTPException(400, "E-mail inválido.")
+    with platform_session() as cur:
+        cur.execute("SELECT 1 FROM platform.usuario_login WHERE lower(email)=%s", (email,))
+        if cur.fetchone():
+            raise HTTPException(409, "Já existe um usuário com esse e-mail.")
+        cur.execute(
+            "INSERT INTO platform.usuario_login (email, senha_hash, nome, tenant_id, papel) "
+            "VALUES (%s,%s,%s,%s,%s)",
+            (email, hash_password(body.senha), body.nome, tid, body.papel))
+    return {"ok": True}
+
+
+@app.put("/usuarios/{email}")
+def usuarios_update(email: str, body: UsuarioIn, user: dict = Depends(current),
+                    tid: str = Depends(tenant_of)):
+    _admin_do_tenant(user)
+    if body.papel not in PAPEIS_TENANT:
+        raise HTTPException(400, "Papel inválido.")
+    if body.senha and len(body.senha) < 8:
+        raise HTTPException(400, "A nova senha precisa de pelo menos 8 caracteres.")
+    with platform_session() as cur:
+        if body.senha:
+            cur.execute(
+                "UPDATE platform.usuario_login SET nome=%s, papel=%s, senha_hash=%s "
+                "WHERE lower(email)=lower(%s) AND tenant_id=%s",
+                (body.nome, body.papel, hash_password(body.senha), email, tid))
+        else:
+            cur.execute(
+                "UPDATE platform.usuario_login SET nome=%s, papel=%s "
+                "WHERE lower(email)=lower(%s) AND tenant_id=%s",
+                (body.nome, body.papel, email, tid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Usuário não encontrado nesta empresa.")
+    return {"ok": True}
+
+
+@app.delete("/usuarios/{email}")
+def usuarios_delete(email: str, user: dict = Depends(current),
+                    tid: str = Depends(tenant_of)):
+    _admin_do_tenant(user)
+    if email.strip().lower() == str(user.get("sub", "")).lower():
+        raise HTTPException(400, "Você não pode excluir o próprio usuário.")
+    with platform_session() as cur:
+        cur.execute(
+            "DELETE FROM platform.usuario_login WHERE lower(email)=lower(%s) AND tenant_id=%s",
+            (email, tid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Usuário não encontrado nesta empresa.")
+    return {"ok": True}
+
+
+class TrocaSenhaIn(BaseModel):
+    senha_atual: str
+    senha_nova: str
+
+
+@app.post("/auth/trocar-senha")
+def trocar_senha(body: TrocaSenhaIn, user: dict = Depends(current)):
+    if len(body.senha_nova) < 8:
+        raise HTTPException(400, "A nova senha precisa de pelo menos 8 caracteres.")
+    with platform_session() as cur:
+        cur.execute("SELECT senha_hash FROM platform.usuario_login WHERE lower(email)=lower(%s)",
+                    (user["sub"],))
+        row = cur.fetchone()
+        if not row or not verify_password(body.senha_atual, row[0]):
+            raise HTTPException(401, "Senha atual incorreta.")
+        cur.execute("UPDATE platform.usuario_login SET senha_hash=%s WHERE lower(email)=lower(%s)",
+                    (hash_password(body.senha_nova), user["sub"]))
+    return {"ok": True}
 
 
 # ---------------------------------------------------- Advisor com IA
