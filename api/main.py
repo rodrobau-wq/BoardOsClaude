@@ -435,6 +435,15 @@ def excluir_kr(kid: str, user: dict = Depends(current),
     return {"ok": True}
 
 
+@app.get("/kpi/ultimo-dia")
+def kpi_ultimo_dia(tid: str = Depends(tenant_of)):
+    """Último dia com dados no gold — o painel usa para achar o mês certo."""
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT max(data) FROM gold_venda_diaria")
+        r = cur.fetchone()
+    return {"ultimo_dia": str(r[0]) if r and r[0] else None}
+
+
 # ------------------------------------------------------------- KPI diário
 @app.get("/kpi/diario")
 def kpi_diario(data_de: str, data_ate: str, tid: str = Depends(tenant_of)):
@@ -934,6 +943,46 @@ async def dados_importar(
     finally:
         _os.unlink(tmp.name)
     return {"ok": True, "linhas": res["linhas"], "dias": res["dias"]}
+
+
+class LinhaDiariaIn(BaseModel):
+    data: str
+    loja_codigo: str
+    faturamento: float
+    cupons: int = 0
+    itens: int = 0
+
+
+class ImportDiarioIn(BaseModel):
+    linhas: list
+
+
+@app.post("/dados/importar-diario")
+def dados_importar_diario(body: ImportDiarioIn, user: dict = Depends(current),
+                          tid: str = Depends(tenant_of)):
+    """Importa vendas já agregadas por dia×loja direto no gold (para fontes que
+    só têm cabeçalho de cupom/diário — ex.: CRM). Upsert idempotente; sem custo
+    sintético (margem fica zerada até existir custo real)."""
+    from datetime import date as _date
+
+    _can_edit(user)
+    if not body.linhas:
+        raise HTTPException(400, "Envie ao menos uma linha.")
+    if len(body.linhas) > 20000:
+        raise HTTPException(413, "Máximo de 20.000 linhas por chamada — divida em partes.")
+    records = []
+    for i, l in enumerate(body.linhas):
+        try:
+            li = LinhaDiariaIn(**l)
+            records.append({"data": _date.fromisoformat(li.data[:10]),
+                            "loja": li.loja_codigo.strip(),
+                            "faturamento": float(li.faturamento),
+                            "cupons": int(li.cupons), "itens": int(li.itens)})
+        except Exception:
+            raise HTTPException(400, f"Linha {i+1} inválida (esperado data ISO, loja_codigo, faturamento).")
+    from boardos.crm import import_vendas_diarias_rows
+    res = import_vendas_diarias_rows(tid, records, margem_sintetica=False)
+    return {"ok": True, "linhas": res["linhas"]}
 
 
 # ------------------------------------------------- gestão de usuários

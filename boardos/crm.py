@@ -136,11 +136,13 @@ def _parse_date(v) -> date:
     return datetime.fromisoformat(s).date()
 
 
-def import_vendas_diarias_rows(tenant_id: str, records) -> Dict:
+def import_vendas_diarias_rows(tenant_id: str, records, margem_sintetica: bool = False) -> Dict:
     """Igual ao _csv, mas recebe registros já tipados em memória.
 
     records: iterável de dicts {data: date, loja: str, faturamento: float,
-    cupons: int, itens: int}. Usado por seeds/geradores.
+    cupons: int, itens: int}. margem_sintetica=True só para dados de DEMO
+    (custo 71%/margem 29% fictícios); dados reais entram com custo/margem 0 —
+    o painel esconde o KPI de margem quando não há custo de verdade.
     """
     with tenant_session(tenant_id) as cur:
         loja_cache: Dict[str, str] = {}
@@ -153,8 +155,10 @@ def import_vendas_diarias_rows(tenant_id: str, records) -> Dict:
                                          {"nome": "Loja " + cod, "tenant_id": tenant_id})
                 loja_cache[cod] = loja_id
             fat = float(r["faturamento"])
-            rows.append((tenant_id, r["data"], loja_id, round(fat * 1.03, 2), fat,
-                         round(fat * 0.71, 2), round(fat * 0.29, 2),
+            custo = round(fat * 0.71, 2) if margem_sintetica else 0.0
+            margem = round(fat * 0.29, 2) if margem_sintetica else 0.0
+            rows.append((tenant_id, r["data"], loja_id, round(fat * 1.03, 2) if margem_sintetica else fat,
+                         fat, custo, margem,
                          int(r.get("itens", 0)), int(r.get("cupons", 0)), float(r.get("itens", 0))))
         cur.executemany(
             """

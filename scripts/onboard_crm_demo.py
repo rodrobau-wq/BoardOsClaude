@@ -151,7 +151,8 @@ def main():
         tid = idmap.get(ext)
         if not tid:
             continue
-        res = crm.import_vendas_diarias_rows(tid, gen_vendas(perfil, salt * 97))
+        res = crm.import_vendas_diarias_rows(tid, gen_vendas(perfil, salt * 97),
+                                             margem_sintetica=True)
         seed_okrs(tid)
         try:
             seed_categorias_gold(tid)

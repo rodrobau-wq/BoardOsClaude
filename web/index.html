@@ -532,13 +532,34 @@ async function load(){
   var ano = +el("ano").value, mes = +el("mes").value;
   setStatus("Carregando…", "info");
   try{
-    var cmp = await jget("/comparacao/yoy?ano="+ano+"&mes="+mes);
-    // séries diárias (atual e ano anterior) para o gráfico
     var mm = String(mes).padStart(2,"0");
     var ult = new Date(ano, mes, 0).getDate();
-    var atual = await jget("/kpi/diario?data_de="+ano+"-"+mm+"-01&data_ate="+ano+"-"+mm+"-"+ult);
-    var ultB = new Date(ano-1, mes, 0).getDate();
-    var base = await jget("/kpi/diario?data_de="+(ano-1)+"-"+mm+"-01&data_ate="+(ano-1)+"-"+mm+"-"+ultB);
+    var atual;
+    try{
+      atual = await jget("/kpi/diario?data_de="+ano+"-"+mm+"-01&data_ate="+ano+"-"+mm+"-"+ult);
+    }catch(e404){
+      // sem dados no mês pedido: pula para o último mês com dados (1x)
+      if(!window.__mesAuto){
+        window.__mesAuto = true;
+        try{
+          var u = await jget("/kpi/ultimo-dia");
+          if(u.ultimo_dia){
+            el("ano").value = +u.ultimo_dia.slice(0,4);
+            el("mes").value = +u.ultimo_dia.slice(5,7);
+            return load();
+          }
+        }catch(_){}
+      }
+      throw e404;
+    }
+    window.__mesAuto = false;
+    // comparação e ano anterior são OPCIONAIS (tenant novo ainda não tem 12 meses)
+    var cmp = null, base = {dias: []};
+    try{
+      cmp = await jget("/comparacao/yoy?ano="+ano+"&mes="+mes);
+      var ultB = new Date(ano-1, mes, 0).getDate();
+      base = await jget("/kpi/diario?data_de="+(ano-1)+"-"+mm+"-01&data_ate="+(ano-1)+"-"+mm+"-"+ultB);
+    }catch(_){ cmp = null; base = {dias: []}; }
     var fcast = null;
     try{ fcast = await jget("/forecast/mes?ano="+ano+"&mes="+mes); }catch(_){}
     last = {cmp: cmp, atual: atual.dias, base: base.dias, fc: fcast};
@@ -581,10 +602,16 @@ function setStatus(txt, kind){
 
 function render(){
   var c = last.cmp;
-  el("periodo").textContent = c.periodo.atual+" vs "+c.periodo.base;
   var vc = el("vCivil"), vv = el("vVarejo");
-  vc.textContent = pct(c.var_civil); vc.className = "v "+(c.var_civil>=0?"up":"down");
-  vv.textContent = pct(c.var_ajustada); vv.className = "v "+(c.var_ajustada>=0?"up":"down");
+  if(c){
+    el("periodo").textContent = c.periodo.atual+" vs "+c.periodo.base;
+    vc.textContent = pct(c.var_civil); vc.className = "v "+(c.var_civil>=0?"up":"down");
+    vv.textContent = pct(c.var_ajustada); vv.className = "v "+(c.var_ajustada>=0?"up":"down");
+  } else {
+    el("periodo").textContent = "ainda sem 12 meses de histórico para comparar com o ano anterior";
+    vc.textContent = "—"; vc.className = "v";
+    vv.textContent = "—"; vv.className = "v";
+  }
   el("lensCivil").classList.toggle("on", lens==="civil");
   el("lensVarejo").classList.toggle("on", lens==="varejo");
 
@@ -593,15 +620,19 @@ function render(){
   var fatSum=0, margSum=0, cupSum=0, itnSum=0;
   last.atual.forEach(function(r){ fatSum+=+r.faturamento_liq; margSum+=+(r.margem||0);
     cupSum+=+(r.cupons||0); itnSum+=+(r.itens||0); });
-  var cards = [
-    ["Faturamento (atual)", brl(c.total_atual)],
-    ["vs. ano ant. — Civil", pct(c.var_civil), c.var_civil>=0?"up":"down"],
-    ["vs. ano ant. — Varejo", pct(c.var_ajustada), c.var_ajustada>=0?"up":"down"],
-    ["Efeito de calendário", pct(c.efeito_calendario)],
-    ["Ticket médio", c.ticket_atual? "R$ "+(+c.ticket_atual).toFixed(2) : "—"],
-    ["Margem bruta", fatSum? (margSum/fatSum*100).toFixed(1)+"%" : "—"],
-    ["Itens por cupom", cupSum? (itnSum/cupSum).toFixed(1) : "—"]
-  ];
+  var ticketReal = cupSum ? fatSum/cupSum : null;
+  var cards = [["Faturamento (mês)", brl(c ? c.total_atual : fatSum)]];
+  if(c){
+    cards.push(["vs. ano ant. — Civil", pct(c.var_civil), c.var_civil>=0?"up":"down"]);
+    cards.push(["vs. ano ant. — Varejo", pct(c.var_ajustada), c.var_ajustada>=0?"up":"down"]);
+    cards.push(["Efeito de calendário", pct(c.efeito_calendario)]);
+  }
+  cards.push(["Ticket médio", (c && c.ticket_atual) ? "R$ "+(+c.ticket_atual).toFixed(2)
+    : (ticketReal ? "R$ "+ticketReal.toFixed(2) : "—")]);
+  if(margSum > 0 && margSum < fatSum){
+    cards.push(["Margem bruta", (margSum/fatSum*100).toFixed(1)+"%"]);
+  }
+  cards.push(["Itens por cupom", cupSum ? (itnSum/cupSum).toFixed(1) : "—"]);
   if(last.fc && last.fc.previsto && last.fc.previsto.length){
     cards.push(["Projeção do mês ✦", brl(last.fc.total_projetado)]);
   }
@@ -612,12 +643,18 @@ function render(){
   });
 
   // Advisor (fallback estatístico; a IA substitui via /advisor/insight)
-  el("advisorFca").innerHTML = ["fato","causa","acao"].map(function(kk){
-    return '<div class="t"><span class="kk">'+kk+'</span><span>'+(c.advisor[kk]||"")+'</span></div>';
-  }).join("");
+  if(c){
+    el("advisorFca").innerHTML = ["fato","causa","acao"].map(function(kk){
+      return '<div class="t"><span class="kk">'+kk+'</span><span>'+(c.advisor[kk]||"")+'</span></div>';
+    }).join("");
+  } else {
+    el("advisorFca").innerHTML = '<span class="hint">A leitura comparativa do Advisor aparece quando houver o mesmo mês do ano anterior na base.</span>';
+  }
 
   // Composição
   var comp = el("comp"); comp.innerHTML="";
+  el("comp").closest("section").classList.toggle("hide", !c);
+  if(!c){ drawChart(); return; }
   Object.keys(c.composicao).forEach(function(lbl){
     var o=c.composicao[lbl];
     var d=document.createElement("div"); d.className="c"+(o.delta!==0?" chg":"");
