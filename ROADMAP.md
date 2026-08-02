@@ -17,6 +17,7 @@
 | Operação | **Gestão de usuários** — convites, papéis, troca de senha (4.1 ✅) |
 | Segurança | Login JWT, senha hash, tenant do token, super-admin, **rate-limit no login + CORS restrito** (5.1 parcial ✅) |
 | Qualidade | **Smoke test de produção** — scripts/test_api_live.py, 15 checagens (5.2 ✅) |
+| Operação SaaS | **Painel super-admin** — cadastrar/suspender/excluir clientes, MRR e uso (4.2 ✅) |
 | Drill-down | Resumo por loja (civil/varejo) + **por categoria com participação** (3.2 ✅) |
 | KPIs | **Margem bruta e itens por cupom** no painel (3.1 parcial ✅) |
 | Forecast | **Projeção do restante do mês** (média por dia-da-semana) no gráfico + card (3.3 ✅) |
