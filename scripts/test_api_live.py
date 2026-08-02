@@ -154,6 +154,17 @@ def main():
     st, pg = req("POST", "/advisor/pergunta", token=tok, body={"pergunta": "Qual loja mais caiu?"})
     check("advisor/pergunta 200 (ia|indisponivel)", st == 200 and pg.get("fonte") in ("ia", "indisponivel"),
           "fonte=" + str(pg.get("fonte")))
+    # 3.14 cadastro de lojas + IBGE
+    st, lj2 = req("POST", "/lojas", token=tok,
+                  body={"codigo": "QA1", "nome": "Loja QA", "municipio": "Campinas", "uf": "SP"})
+    check("loja POST + IBGE automático", st == 200 and (lj2.get("populacao") or 0) > 1_000_000,
+          f"pop={lj2.get('populacao')} pib/hab={lj2.get('pib_per_capita')}")
+    if lj2.get("id"):
+        st, _ = req("POST", "/lojas/" + lj2["id"] + "/ibge", token=tok)
+        check("loja IBGE refresh", st == 200)
+        st, _ = req("DELETE", "/lojas/" + lj2["id"], token=tok)
+        check("loja DELETE (sem vendas)", st == 200)
+
     st, cons = req("GET", "/conselho/pautas", token=tok)
     check("conselho/pautas 200 + 5 conselheiros", st == 200 and len(cons.get("conselheiros", [])) == 5,
           " | ".join(c["nome"].split(" ")[-1] for c in cons.get("conselheiros", [])))

@@ -756,6 +756,127 @@ def acoes_delete(aid: str, user: dict = Depends(current), tid: str = Depends(ten
     return {"ok": True}
 
 
+# ------------------------------------- cadastro de lojas + IBGE (3.14)
+class LojaIn(BaseModel):
+    codigo: str
+    nome: str
+    formato: Optional[str] = None
+    endereco: Optional[str] = None
+    municipio: Optional[str] = None
+    uf: Optional[str] = None
+    area_vendas_m2: Optional[float] = None
+
+
+LOJA_COLS = ("id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2, "
+             "ibge_id, populacao, populacao_ano, pib_per_capita, pib_ano")
+
+
+def _loja_row(r):
+    return {"id": str(r[0]), "codigo": r[1], "nome": r[2], "formato": r[3],
+            "endereco": r[4], "municipio": r[5], "uf": r[6],
+            "area_vendas_m2": float(r[7]) if r[7] is not None else None,
+            "ibge_id": r[8], "populacao": r[9], "populacao_ano": r[10],
+            "pib_per_capita": float(r[11]) if r[11] is not None else None,
+            "pib_ano": r[12]}
+
+
+def _ibge_atualiza(cur, loja_id: str, municipio: str, uf: str) -> None:
+    """Best-effort: busca IBGE e grava na loja. Nunca falha o request principal."""
+    from boardos import ibge as _ibge
+    try:
+        d = _ibge.enriquecer(municipio or "", uf or "")
+    except Exception:
+        d = None
+    if d:
+        cur.execute(
+            "UPDATE loja SET ibge_id=%s, populacao=%s, populacao_ano=%s, "
+            "pib_per_capita=%s, pib_ano=%s, ibge_atualizado_em=now() WHERE id=%s",
+            (d.get("ibge_id"), d.get("populacao"), d.get("populacao_ano"),
+             d.get("pib_per_capita"), d.get("pib_ano"), loja_id))
+
+
+@app.get("/lojas")
+def lojas_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute(f"SELECT {LOJA_COLS} FROM loja ORDER BY codigo")
+        rows = [_loja_row(r) for r in cur.fetchall()]
+    return {"lojas": rows}
+
+
+@app.post("/lojas")
+def lojas_post(body: LojaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if not body.codigo.strip() or not body.nome.strip():
+        raise HTTPException(400, "Informe código e nome da loja.")
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT 1 FROM loja WHERE codigo=%s", (body.codigo.strip(),))
+        if cur.fetchone():
+            raise HTTPException(409, "Já existe uma loja com esse código.")
+        cur.execute(
+            "INSERT INTO loja (tenant_id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (tid, body.codigo.strip(), body.nome.strip(), body.formato,
+             body.endereco, body.municipio, (body.uf or "").upper()[:2] or None,
+             body.area_vendas_m2))
+        lid = str(cur.fetchone()[0])
+        if body.municipio and body.uf:
+            _ibge_atualiza(cur, lid, body.municipio, body.uf)
+        cur.execute(f"SELECT {LOJA_COLS} FROM loja WHERE id=%s", (lid,))
+        loja = _loja_row(cur.fetchone())
+    return loja
+
+
+@app.put("/lojas/{lid}")
+def lojas_put(lid: str, body: LojaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "UPDATE loja SET codigo=%s, nome=%s, formato=%s, endereco=%s, "
+            "municipio=%s, uf=%s, area_vendas_m2=%s WHERE id=%s",
+            (body.codigo.strip(), body.nome.strip(), body.formato, body.endereco,
+             body.municipio, (body.uf or "").upper()[:2] or None,
+             body.area_vendas_m2, lid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Loja não encontrada.")
+        if body.municipio and body.uf:
+            _ibge_atualiza(cur, lid, body.municipio, body.uf)
+        cur.execute(f"SELECT {LOJA_COLS} FROM loja WHERE id=%s", (lid,))
+        loja = _loja_row(cur.fetchone())
+    return loja
+
+
+@app.post("/lojas/{lid}/ibge")
+def lojas_ibge(lid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    """Reconsulta os dados do IBGE para a loja (município/UF do cadastro)."""
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT municipio, uf FROM loja WHERE id=%s", (lid,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Loja não encontrada.")
+        if not (row[0] and row[1]):
+            raise HTTPException(400, "Preencha município e UF da loja primeiro.")
+        _ibge_atualiza(cur, lid, row[0], row[1])
+        cur.execute(f"SELECT {LOJA_COLS} FROM loja WHERE id=%s", (lid,))
+        loja = _loja_row(cur.fetchone())
+    if not loja.get("ibge_id"):
+        raise HTTPException(404, f"Município \"{row[0]}/{row[1]}\" não encontrado no IBGE — confira a grafia.")
+    return loja
+
+
+@app.delete("/lojas/{lid}")
+def lojas_delete(lid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        try:
+            cur.execute("DELETE FROM loja WHERE id=%s", (lid,))
+        except Exception:
+            raise HTTPException(409, "Esta loja tem vendas registradas — não pode ser excluída.")
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Loja não encontrada.")
+    return {"ok": True}
+
+
 # ------------------------------------- 4.4 upload de dados (self-service)
 @app.post("/dados/importar")
 async def dados_importar(
