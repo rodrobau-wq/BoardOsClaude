@@ -112,6 +112,46 @@ def kpi_diario(
     return {"periodo": [data_de, data_ate], "dias": rows}
 
 
+def _kr_progresso(meta, atual, base, direcao):
+    """% de avanço do KR (0..1.5) + farol."""
+    meta = float(meta); atual = float(atual)
+    base = float(base) if base is not None else None
+    if base is not None and meta != base:
+        p = (atual - base) / (meta - base)
+    elif direcao == "up":
+        p = atual / meta if meta else 0.0
+    else:  # menor é melhor
+        p = meta / atual if atual else 0.0
+    p = max(0.0, min(p, 1.5))
+    farol = "g" if p >= 0.7 else "a" if p >= 0.4 else "r"
+    return round(p, 3), farol
+
+
+@app.get("/okrs")
+def okrs(x_tenant_id: str = Header(..., alias="X-Tenant-Id")):
+    """Metas (OKRs) do tenant: objetivos com seus resultados-chave, progresso e farol."""
+    with tenant_session(x_tenant_id) as cur:
+        cur.execute(
+            "SELECT id, titulo, periodo, nivel, owner FROM okr_objetivo "
+            "ORDER BY ordem, criado_em")
+        objs = [{"id": str(r[0]), "titulo": r[1], "periodo": r[2],
+                 "nivel": r[3], "owner": r[4], "krs": []} for r in cur.fetchall()]
+        by_id = {o["id"]: o for o in objs}
+        cur.execute(
+            "SELECT objetivo_id, titulo, unidade, meta, atual, base, direcao "
+            "FROM okr_kr ORDER BY ordem")
+        for r in cur.fetchall():
+            oid = str(r[0])
+            if oid not in by_id:
+                continue
+            prog, farol = _kr_progresso(r[3], r[4], r[5], r[6])
+            by_id[oid]["krs"].append({
+                "titulo": r[1], "unidade": r[2],
+                "meta": float(r[3]), "atual": float(r[4]),
+                "progresso": prog, "farol": farol})
+    return {"objetivos": objs}
+
+
 @app.get("/comparacao/yoy")
 def comparacao_yoy(
     ano: int,

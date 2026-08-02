@@ -23,6 +23,35 @@ except ImportError:
     psycopg = None
 from boardos import crm  # noqa: E402
 from boardos.calendar_gen import upsert_into  # noqa: E402
+from boardos.db import tenant_session  # noqa: E402
+
+# OKRs demo (varejo). (titulo, periodo) -> lista de KRs (titulo, unidade, meta, atual, base, direcao)
+OKRS_DEMO = [
+    ("Crescer com rentabilidade em 2026", "2026", [
+        ("Faturamento +8% no ano", "%", 8, 5.5, 0, "up"),
+        ("Margem bruta ≥ 22%", "%", 22, 21.4, 20, "up"),
+        ("Ruptura ≤ 3%", "%", 3, 4.8, 6, "down"),
+    ]),
+    ("Fidelizar o cliente", "2026", [
+        ("Base fidelidade +15 mil", "clientes", 15000, 10600, 0, "up"),
+        ("Ticket médio +5%", "%", 5, 3.4, 0, "up"),
+    ]),
+]
+
+
+def seed_okrs(tenant_id: str) -> None:
+    with tenant_session(tenant_id) as cur:
+        cur.execute("DELETE FROM okr_objetivo WHERE tenant_id = %s", (tenant_id,))
+        for o_ordem, (titulo, periodo, krs) in enumerate(OKRS_DEMO):
+            oid = cur.execute(
+                "INSERT INTO okr_objetivo (tenant_id, titulo, periodo, ordem) "
+                "VALUES (%s,%s,%s,%s) RETURNING id",
+                (tenant_id, titulo, periodo, o_ordem)).fetchone()[0]
+            for k_ordem, (kt, un, meta, atual, base, direcao) in enumerate(krs):
+                cur.execute(
+                    "INSERT INTO okr_kr (tenant_id, objetivo_id, titulo, unidade, meta, atual, base, direcao, ordem) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (tenant_id, oid, kt, un, meta, atual, base, direcao, k_ordem))
 
 ADMIN_DSN = (os.environ.get("BOARDOS_ADMIN_DSN") or os.environ.get("DATABASE_URL")
              or "postgresql://boardos_admin:change-me-admin@localhost:5432/boardos")
@@ -82,7 +111,8 @@ def main():
         if not tid:
             continue
         res = crm.import_vendas_diarias_rows(tid, gen_vendas(perfil, salt * 97))
-        print(f"  {ext} ({tid}): {res['linhas']} linhas de gold")
+        seed_okrs(tid)
+        print(f"  {ext} ({tid}): {res['linhas']} linhas de gold + OKRs demo")
     print("\nOK — abra o painel e escolha a empresa no seletor.")
 
 

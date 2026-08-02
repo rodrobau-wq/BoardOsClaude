@@ -73,6 +73,17 @@
   .legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
   .legend i{display:inline-block;width:16px;height:0;vertical-align:middle;margin-right:5px}
   .lg-a i{border-top:3px solid var(--accent)}.lg-p i{border-top:2px dashed var(--prioryr)}
+  .okr-obj{padding:14px 0;border-top:1px solid var(--border)}
+  .okr-obj:first-child{border-top:0;padding-top:0}
+  .okr-obj h3{margin:0;font-size:14px}
+  .okr-obj .own{color:var(--muted);font-size:12px;margin:2px 0 8px}
+  .kr{display:flex;flex-direction:column;gap:5px;margin:9px 0}
+  .kr .top{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+  .kr .top .v{font-variant-numeric:tabular-nums;font-weight:600}
+  .bar{height:7px;border-radius:6px;background:var(--surface-2);border:1px solid var(--border);overflow:hidden}
+  .bar>span{display:block;height:100%}
+  .pg{color:var(--good)}.pa{color:var(--warn)}.pr{color:var(--crit)}
+  .bg{background:var(--good)}.ba{background:var(--warn)}.br{background:var(--crit)}
   .msg{padding:16px;border-radius:12px;font-size:13.5px}
   .msg.err{background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit)}
   .msg.info{background:var(--accent-soft);color:var(--accent-strong)}
@@ -132,6 +143,11 @@
     </section>
 
     <section class="card">
+      <header><h2>Metas (OKRs)</h2><span class="sub">2026</span></header>
+      <div class="body" id="okrs"></div>
+    </section>
+
+    <section class="card">
       <header><h2>Resumo do Advisor</h2><span class="sub">✦ IA</span></header>
       <div class="body" style="display:flex;gap:12px">
         <div class="ai">✦</div>
@@ -179,6 +195,8 @@ async function load(){
     var base = await jget("/kpi/diario?data_de="+(ano-1)+"-"+mm+"-01&data_ate="+(ano-1)+"-"+mm+"-"+ultB);
     last = {cmp, atual:atual.dias, base:base.dias};
     render();
+    try{ var ok = await jget("/okrs"); renderOkrs(ok.objetivos); }
+    catch(_){ el("okrs").innerHTML='<span class="hint">Sem metas cadastradas.</span>'; }
     el("content").classList.remove("hide");
     setStatus("", "hide");
   }catch(e){
@@ -232,6 +250,27 @@ function render(){
   });
 
   drawChart();
+}
+
+function renderOkrs(objetivos){
+  var box = el("okrs");
+  if(!objetivos || !objetivos.length){ box.innerHTML='<span class="hint">Sem metas cadastradas.</span>'; return; }
+  box.innerHTML = objetivos.map(function(o){
+    var krs = (o.krs||[]).map(function(k){
+      var pctTxt = Math.round(k.progresso*100)+"%";
+      var fill = k.farol==="g"?"bg":k.farol==="a"?"ba":"br";
+      var col = k.farol==="g"?"pg":k.farol==="a"?"pa":"pr";
+      var atual = (+k.atual).toLocaleString("pt-BR");
+      var meta = (+k.meta).toLocaleString("pt-BR");
+      var un = k.unidade && k.unidade!=="clientes" ? k.unidade : "";
+      return '<div class="kr"><div class="top"><span>'+k.titulo+'</span>'+
+             '<span class="v '+col+'">'+pctTxt+'</span></div>'+
+             '<div class="bar"><span class="'+fill+'" style="width:'+Math.min(100,Math.round(k.progresso*100))+'%"></span></div>'+
+             '<div class="top"><span class="hint">'+atual+un+' / '+meta+un+'</span></div></div>';
+    }).join("");
+    return '<div class="okr-obj"><h3>'+o.titulo+'</h3>'+
+           '<div class="own">'+(o.nivel||"corporativo")+(o.owner?" · "+o.owner:"")+" · "+(o.periodo||"")+'</div>'+krs+'</div>';
+  }).join("");
 }
 
 // série do ano anterior conforme a lente: civil (mesma data) ou varejo (semana alinhada).
