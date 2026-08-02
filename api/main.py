@@ -215,6 +215,18 @@ def tenant_update(tid2: str, body: TenantIn, user: dict = Depends(current)):
     return {"ok": True}
 
 
+@app.delete("/tenants/{tid2}")
+def tenant_delete(tid2: str, user: dict = Depends(current)):
+    """Exclui uma empresa e TODOS os seus dados (cascade). Irreversível —
+    uso operacional do super-admin (ex.: cadastro de teste)."""
+    _super(user)
+    with platform_session() as cur:
+        cur.execute("DELETE FROM platform.tenant WHERE id=%s", (tid2,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Empresa não encontrada.")
+    return {"ok": True}
+
+
 @app.get("/admin/metricas")
 def admin_metricas(user: dict = Depends(current)):
     """Métricas da plataforma: por empresa (usuários, uso do mês, receita

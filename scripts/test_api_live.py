@@ -162,6 +162,8 @@ def main():
         st, _ = req("PUT", "/tenants/" + nt["id"], token=atok,
                     body={"nome": "TESTE Smoke Ltda", "status": "cancelado"})
         check("tenant PUT (suspender)", st == 200)
+        st, _ = req("DELETE", "/tenants/" + nt["id"], token=atok)
+        check("tenant DELETE (limpeza)", st == 200)
 
     print(f"\n{_ok} ok, {_fail} falha(s).")
     sys.exit(1 if _fail else 0)
