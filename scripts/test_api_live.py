@@ -154,6 +154,16 @@ def main():
     st, pg = req("POST", "/advisor/pergunta", token=tok, body={"pergunta": "Qual loja mais caiu?"})
     check("advisor/pergunta 200 (ia|indisponivel)", st == 200 and pg.get("fonte") in ("ia", "indisponivel"),
           "fonte=" + str(pg.get("fonte")))
+    st, cons = req("GET", "/conselho/pautas", token=tok)
+    check("conselho/pautas 200 + 5 conselheiros", st == 200 and len(cons.get("conselheiros", [])) == 5,
+          " | ".join(c["nome"].split(" ")[-1] for c in cons.get("conselheiros", [])))
+    st, pp = req("POST", "/advisor/pergunta", token=tok,
+                 body={"pergunta": "Qual categoria priorizar?", "persona": "categorias"})
+    check("pergunta com persona 200", st == 200 and pp.get("fonte") in ("ia", "indisponivel"))
+    st, _ = req("POST", "/advisor/pergunta", token=tok,
+                body={"pergunta": "x", "persona": "invalida"})
+    check("persona inválida => 400", st == 400)
+
     st, rx = req("GET", "/advisor/resumo-executivo", token=tok)
     check("resumo-executivo 200 com texto", st == 200 and bool(rx.get("texto")),
           "fonte=" + str(rx.get("fonte")))

@@ -167,6 +167,27 @@
     border-radius:9px;padding:11px 12px;font:14px var(--font);min-height:64px;resize:vertical}
   #descResumo{white-space:pre-wrap;font-size:13px;line-height:1.6;background:var(--surface-2);
     border:1px solid var(--border);border-radius:11px;padding:14px;margin-top:12px}
+  #content,#plano,#execucao,#config,#admin,#conselho{display:flex;flex-direction:column;gap:16px}
+  .cons-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+  .cons-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    box-shadow:var(--shadow);padding:18px}
+  .cons-top{display:flex;gap:12px;align-items:center;margin-bottom:10px}
+  .cons-ava{width:42px;height:42px;flex:none;border-radius:50%;display:grid;place-items:center;
+    color:#fff;font-weight:800;font-size:15px;letter-spacing:.5px}
+  .cons-card h3{margin:0;font-size:15px}
+  .cons-card .foco{color:var(--muted);font-size:12px}
+  .cons-card ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:7px}
+  .cons-card li{font-size:13px;color:var(--ink-2)}
+  .pagehead{margin:2px 0 2px}
+  .pagehead h2{margin:0;font-size:20px;letter-spacing:-.4px}
+  .pagehead p{margin:4px 0 0;color:var(--muted);font-size:13.5px;max-width:70ch}
+  .chk{display:flex;gap:11px;align-items:center;padding:9px 0;border-top:1px solid var(--border);font-size:13.5px}
+  .chk:first-child{border-top:0;padding-top:0}
+  .chk .mark{width:22px;height:22px;flex:none;border-radius:50%;border:2px solid var(--border);
+    display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff}
+  .chk.done .mark{background:var(--good);border-color:var(--good)}
+  .chk.done span{color:var(--muted);text-decoration:line-through}
+  .chk .ib{color:var(--accent);font-weight:700}
   .hide{display:none!important}
 </style>
 </head>
@@ -175,8 +196,11 @@
   <div class="logo">B</div>
   <div><b>BoardOS</b><small id="tenantNome">Painel Estratégico</small></div>
   <div class="tabs hide" id="tabs">
-    <button class="tab on" data-tab="painel">Painel</button>
-    <button class="tab" data-tab="plano">Plano</button>
+    <button class="tab on" data-tab="hoje">Hoje</button>
+    <button class="tab" data-tab="conselho">Conselho</button>
+    <button class="tab" data-tab="estrategia">Estratégia</button>
+    <button class="tab" data-tab="execucao">Execução</button>
+    <button class="tab" data-tab="config">Configurações</button>
     <button class="tab hide" data-tab="admin" id="tabAdmin">Admin</button>
   </div>
   <div class="cfg hide" id="cfg">
@@ -202,9 +226,31 @@
 
   <div id="status" class="msg info hide">Clique <b>Carregar</b>.</div>
 
+  <div id="conselho" class="hide">
+    <div class="pagehead"><h2>Seu conselho de alto nível — sempre de plantão</h2>
+      <p>Cinco conselheiros olham os números da sua rede: estratégia, gerenciamento de categoria,
+         trade & indústria (JBP), clientes (CRM) e novas receitas (retail media). A pauta de cada um
+         é calculada dos seus dados — e todos respondem às suas perguntas.</p></div>
+    <section class="card">
+      <header><h2>Pergunte ao conselho</h2><span class="sub">✦ IA por conselheiro</span></header>
+      <div class="body">
+        <div class="desc-nav" style="margin:0">
+          <select id="consPersona" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:9px 10px;font:13px var(--font)"></select>
+          <input id="consPergunta" placeholder="ex.: como recupero a categoria que mais caiu?"
+            style="flex:1;min-width:220px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:9px 12px;font:13.5px var(--font)">
+          <button class="btn" id="consBtn" style="padding:9px 16px;font-size:13px">Perguntar</button>
+        </div>
+        <div id="consResp" class="hide" style="margin-top:12px;font-size:13.5px;white-space:pre-wrap;line-height:1.55;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px"></div>
+      </div>
+    </section>
+    <div class="cons-grid" id="consCards"><span class="hint">Carregando o conselho…</span></div>
+  </div>
+
   <div id="plano" class="hide">
-    <section class="card" style="margin-bottom:16px">
-      <header><h2>Entrevista de Descoberta</h2><span class="sub" id="descProg"></span></header>
+    <div class="pagehead"><h2>Estratégia — onde sua rede quer chegar</h2>
+      <p>Quatro passos, na ordem: conte a história da rede, defina a direção, diagnostique a situação e transforme tudo em metas mensuráveis. O resto do BoardOS trabalha para este plano.</p></div>
+    <section class="card">
+      <header><h2>Passo 1 · Entrevista de Descoberta</h2><span class="sub" id="descProg"></span></header>
       <div class="body">
         <div id="descWizard">
           <div class="desc-meta" id="descBloco"></div>
@@ -223,8 +269,8 @@
       </div>
     </section>
 
-    <section class="card" style="margin-bottom:16px">
-      <header><h2>Direção Estratégica</h2>
+    <section class="card">
+      <header><h2>Passo 2 · Direção Estratégica</h2>
         <button class="btn" id="dirSalvar" style="padding:6px 14px;font-size:12.5px">Salvar</button>
       </header>
       <div class="body form-grid">
@@ -235,34 +281,59 @@
       </div>
     </section>
 
-    <section class="card" style="margin-bottom:16px">
-      <header><h2>Diagnóstico — SWOT</h2><span class="sub">5–10 itens por quadrante</span></header>
+    <section class="card">
+      <header><h2>Passo 3 · Diagnóstico — SWOT</h2><span class="sub">5–10 itens por quadrante</span></header>
       <div class="body swot-grid" id="swotGrid"></div>
     </section>
 
-    <section class="card" style="margin-bottom:16px">
-      <header><h2>Radar de Maturidade</h2>
+    <section class="card">
+      <header><h2>Passo 3 · Radar de Maturidade</h2>
         <button class="btn" id="radarSalvar" style="padding:6px 14px;font-size:12.5px">Salvar notas</button>
       </header>
       <div class="body" id="radarBody"></div>
     </section>
 
-    <section class="card" style="margin-bottom:16px">
-      <header><h2>Feriados e Datas Sazonais</h2><span class="sub">alimentam o Advisor e o calendário comercial</span></header>
-      <div class="body">
-        <div class="desc-nav" style="margin:0 0 12px">
-          <input type="date" id="ferData" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
-          <input id="ferNome" placeholder="ex.: Padroeira da cidade" style="flex:1;min-width:160px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
-          <select id="ferTipo" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
-            <option value="feriado">Feriado</option><option value="sazonal">Data comercial</option>
-          </select>
-          <button class="btn" id="ferAdd" style="padding:8px 14px;font-size:13px">＋ Adicionar</button>
-        </div>
-        <div id="ferLista" class="hint">Carregando…</div>
-      </div>
+<section class="card">
+      <header><h2>Passo 4 · Metas do ano (OKRs)</h2>
+        <button class="btn ghost" id="okrAdd" style="padding:6px 12px;font-size:12.5px">＋ Meta</button>
+      </header>
+      <div class="body" id="okrs"></div>
     </section>
 
-    <section class="card" style="margin-bottom:16px">
+  </div>
+
+  <div id="execucao" class="hide">
+    <div class="pagehead"><h2>Execução — o que estamos fazendo a respeito</h2>
+      <p>O ciclo de correção do BoardOS: o desvio aparece no alerta, vira um plano com dono e prazo, e a ação entra no 5W2H até o número voltar para a rota.</p></div>
+<section class="card">
+      <header><h2>Precisa de atenção</h2><span class="sub" id="alertSub"></span></header>
+      <div class="body alerts" id="alertas"></div>
+    </section>
+
+<section class="card">
+      <header><h2>Planos de ação — Fato → Causa → Ação</h2>
+        <button class="btn ghost" id="fcaAdd" style="padding:6px 12px;font-size:12.5px">＋ Plano</button>
+      </header>
+      <div class="body" id="fca"></div>
+    </section>
+
+<section class="card">
+      <header><h2>Plano de Ação — 5W2H</h2>
+        <button class="btn ghost" id="acaoAdd" style="padding:6px 12px;font-size:12.5px">＋ Ação</button>
+      </header>
+      <div class="body" style="overflow-x:auto">
+        <table class="tbl" id="acoesTbl">
+          <thead><tr><th>O quê</th><th>Quem</th><th>Quando</th><th>Custo</th><th>Meta ligada</th><th>Status</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="config" class="hide">
+    <div class="pagehead"><h2>Configurações — dados e ajustes da sua conta</h2>
+      <p>Conecte as vendas, cadastre o calendário comercial e gerencie quem acessa o quê.</p></div>
+<section class="card">
       <header><h2>Importar dados de venda (CSV)</h2><span class="sub">grão cupom/item · reenvio não duplica</span></header>
       <div class="body">
         <div class="desc-nav" style="margin:0 0 10px">
@@ -278,13 +349,28 @@
       </div>
     </section>
 
-    <section class="card">
-      <header><h2>Plano de Ação — 5W2H</h2>
-        <button class="btn ghost" id="acaoAdd" style="padding:6px 12px;font-size:12.5px">＋ Ação</button>
+<section class="card">
+      <header><h2>Feriados e Datas Sazonais</h2><span class="sub">alimentam o Advisor e o calendário comercial</span></header>
+      <div class="body">
+        <div class="desc-nav" style="margin:0 0 12px">
+          <input type="date" id="ferData" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+          <input id="ferNome" placeholder="ex.: Padroeira da cidade" style="flex:1;min-width:160px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+          <select id="ferTipo" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+            <option value="feriado">Feriado</option><option value="sazonal">Data comercial</option>
+          </select>
+          <button class="btn" id="ferAdd" style="padding:8px 14px;font-size:13px">＋ Adicionar</button>
+        </div>
+        <div id="ferLista" class="hint">Carregando…</div>
+      </div>
+    </section>
+
+<section class="card hide" id="usersCard">
+      <header><h2>Usuários da empresa</h2>
+        <button class="btn ghost" id="userAdd" style="padding:6px 12px;font-size:12.5px">＋ Usuário</button>
       </header>
       <div class="body" style="overflow-x:auto">
-        <table class="tbl" id="acoesTbl">
-          <thead><tr><th>O quê</th><th>Quem</th><th>Quando</th><th>Custo</th><th>Meta ligada</th><th>Status</th><th></th></tr></thead>
+        <table class="tbl" id="usersTbl">
+          <thead><tr><th>E-mail</th><th>Nome</th><th>Papel</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -307,6 +393,10 @@
   </div>
 
   <div id="content" class="hide">
+    <section class="card hide" id="checklistCard" style="border-color:color-mix(in srgb,var(--accent) 35%,var(--border))">
+      <header><h2>Comece por aqui — monte o BoardOS da sua rede</h2><span class="sub" id="chkSub"></span></header>
+      <div class="body" id="checklist"></div>
+    </section>
     <!-- hero civil vs varejo -->
     <section class="card">
       <header>
@@ -332,11 +422,6 @@
     </section>
 
     <div class="kpis" id="kpis"></div>
-
-    <section class="card">
-      <header><h2>Precisa de atenção</h2><span class="sub" id="alertSub"></span></header>
-      <div class="body alerts" id="alertas"></div>
-    </section>
 
     <section class="card">
       <header><h2>Vendas diárias</h2>
@@ -369,20 +454,6 @@
     </section>
 
     <section class="card">
-      <header><h2>Metas (OKRs)</h2>
-        <button class="btn ghost" id="okrAdd" style="padding:6px 12px;font-size:12.5px">＋ Meta</button>
-      </header>
-      <div class="body" id="okrs"></div>
-    </section>
-
-    <section class="card">
-      <header><h2>Planos de ação — Fato → Causa → Ação</h2>
-        <button class="btn ghost" id="fcaAdd" style="padding:6px 12px;font-size:12.5px">＋ Plano</button>
-      </header>
-      <div class="body" id="fca"></div>
-    </section>
-
-    <section class="card">
       <header><h2>Resumo do Advisor</h2>
         <span style="display:inline-flex;gap:10px;align-items:center">
           <button class="btn ghost" id="btnResumoExec" style="padding:6px 12px;font-size:12.5px">Resumo executivo</button>
@@ -409,17 +480,6 @@
       <div class="body comp" id="comp"></div>
     </section>
 
-    <section class="card hide" id="usersCard">
-      <header><h2>Usuários da empresa</h2>
-        <button class="btn ghost" id="userAdd" style="padding:6px 12px;font-size:12.5px">＋ Usuário</button>
-      </header>
-      <div class="body" style="overflow-x:auto">
-        <table class="tbl" id="usersTbl">
-          <thead><tr><th>E-mail</th><th>Nome</th><th>Papel</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
   </div>
 </div>
 
@@ -451,7 +511,7 @@ async function jget(path){
 
 async function load(){
   planoCarregado = false;                 // troca de empresa/período: Plano recarrega
-  if(TAB === "plano") loadPlano();
+  if(TAB === "estrategia") loadPlano();
   var emp = el("empresa");
   if(!emp.classList.contains("hide") && !emp.value){
     setStatus("Escolha a <b>empresa</b> no seletor para carregar os dados.", "info"); return;
@@ -652,17 +712,48 @@ async function excluir(tipo, id){
 }
 
 /* ===================== aba Plano (1.2–1.5) ===================== */
-var TAB = "painel", planoCarregado = false;
+var TAB = "hoje", planoCarregado = false, consCarregado = false;
+var CONS_CORES = {estrategia:"linear-gradient(135deg,#2D5BE3,#1E3F9E)",
+  categorias:"linear-gradient(135deg,#12855A,#0B5E3F)",
+  trade:"linear-gradient(135deg,#B5790A,#8A5B06)",
+  clientes:"linear-gradient(135deg,#8B5CF6,#6D34E8)",
+  receitas:"linear-gradient(135deg,#CB3A50,#A02438)"};
+async function loadConselho(){
+  consCarregado = true;
+  try{
+    var r = await jget("/conselho/pautas");
+    var cs = r.conselheiros || [];
+    var sel = el("consPersona");
+    sel.innerHTML = '<option value="">Conselho completo</option>' +
+      cs.map(function(c){ return '<option value="'+c.id+'">'+c.nome+'</option>'; }).join("");
+    el("consCards").innerHTML = cs.map(function(c){
+      var ini = c.nome.split(" ").filter(function(w){return w[0]===w[0].toUpperCase();})
+        .slice(1,3).map(function(w){return w[0];}).join("") || c.nome.slice(0,2);
+      return '<div class="cons-card"><div class="cons-top">'
+        + '<div class="cons-ava" style="background:'+(CONS_CORES[c.id]||"var(--accent)")+'">'+ini+'</div>'
+        + '<div><h3>'+c.nome+'</h3><div class="foco">'+c.foco+'</div></div></div>'
+        + '<ul>'+c.pauta.map(function(pt){ return "<li>"+pt+"</li>"; }).join("")+'</ul>'
+        + '<div style="margin-top:12px"><button class="ib" data-cons="'+c.id+'">Perguntar a este conselheiro →</button></div>'
+        + '</div>';
+    }).join("");
+  }catch(e){ el("consCards").innerHTML = '<span class="hint">Não foi possível carregar o conselho: '+e.message+'</span>'; }
+}
 function showTab(t){
   TAB = t;
   Array.prototype.forEach.call(document.querySelectorAll("#tabs .tab"), function(b){
     b.classList.toggle("on", b.getAttribute("data-tab") === t);
   });
-  el("plano").classList.toggle("hide", t !== "plano");
+  el("conselho").classList.toggle("hide", t !== "conselho");
+  el("plano").classList.toggle("hide", t !== "estrategia");
+  el("execucao").classList.toggle("hide", t !== "execucao");
+  el("config").classList.toggle("hide", t !== "config");
   el("admin").classList.toggle("hide", t !== "admin");
-  if(t === "painel"){ if(last) el("content").classList.remove("hide"); }
+  if(t === "hoje"){ if(last) el("content").classList.remove("hide"); }
   else el("content").classList.add("hide");
-  if(t === "plano" && !planoCarregado) loadPlano();
+  if(t === "conselho" && !consCarregado) loadConselho();
+  if(t === "estrategia" && !planoCarregado) loadPlano();
+  if(t === "execucao") refreshAcoes();
+  if(t === "config") refreshFeriados();
   if(t === "admin") loadAdmin();
 }
 
@@ -744,7 +835,7 @@ async function loadPlano(){
     el("dirValores").value = dir.valores || "";
     el("dirObjetivo").value = dir.objetivo_lp || "";
   }catch(_){}
-  refreshSwot(); refreshRadar(); refreshAcoes(); refreshFeriados();
+  refreshSwot(); refreshRadar();
 }
 function firstUnanswered(){
   for(var i=0;i<descQ.length;i++){ if(!(descR[descQ[i].k]||"").trim()) return i; }
@@ -904,6 +995,34 @@ function editorAcao(a, anchor){
   }, a?"Salvar":"Criar");
 }
 
+async function renderChecklist(){
+  var box = el("checklist"); if(!box) return;
+  var dados = !!(last && last.atual && last.atual.length);
+  var metasOk = okrCache.length > 0;
+  var acaoOk = fcaCache.length > 0;
+  var descOk = false;
+  try{
+    var d = await jget("/descoberta");
+    descOk = (d.obrigatorias||[]).length > 0 &&
+      (d.obrigatorias||[]).every(function(k){ return ((d.respostas||{})[k]||"").trim(); });
+  }catch(_){}
+  var itens = [
+    ["Conectar seus dados de venda", dados, "config"],
+    ["Contar a história da sua rede (Descoberta)", descOk, "estrategia"],
+    ["Definir as metas do ano", metasOk, "estrategia"],
+    ["Abrir o primeiro plano de ação", acaoOk, "execucao"]
+  ];
+  var feitos = itens.filter(function(i){ return i[1]; }).length;
+  if(feitos === itens.length){ el("checklistCard").classList.add("hide"); return; }
+  el("checklistCard").classList.remove("hide");
+  el("chkSub").textContent = feitos + " de " + itens.length + " concluídos";
+  box.innerHTML = itens.map(function(i){
+    return '<div class="chk'+(i[1]?" done":"")+'"><span class="mark">'+(i[1]?"✓":"")+'</span>'+
+      '<span style="flex:1">'+i[0]+'</span>'+
+      (i[1] ? '' : '<button class="ib" data-goto="'+i[2]+'">Começar →</button>')+'</div>';
+  }).join("");
+}
+
 var alertCache = [];
 function renderAlertas(itens){
   alertCache = itens || [];
@@ -925,6 +1044,7 @@ var fcaCache = [];
 async function refreshFca(){
   try{ var r = await jget("/fca"); renderFca(r.ciclos); }
   catch(_){ el("fca").innerHTML = '<span class="hint">Sem planos de ação.</span>'; }
+  renderChecklist();
 }
 
 var FCA_ST = {aberto:"Aberto", em_andamento:"Em andamento", resolvido:"Resolvido", descartado:"Descartado"};
@@ -1148,9 +1268,15 @@ function showLogin(msg){
   el("status").classList.add("hide");
   el("tabs").classList.add("hide");
   el("plano").classList.add("hide");
+  el("conselho").classList.add("hide");
+  el("execucao").classList.add("hide");
+  el("config").classList.add("hide");
   el("admin").classList.add("hide");
   el("tabAdmin").classList.add("hide");
-  planoCarregado = false; TAB = "painel";
+  planoCarregado = false; TAB = "hoje";
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs .tab"), function(b){
+    b.classList.toggle("on", b.getAttribute("data-tab") === "hoje");
+  });
   el("tenantNome").textContent = "Painel Estratégico";
   el("loginErr").textContent = msg || "";
 }
@@ -1216,6 +1342,23 @@ el("senha").addEventListener("keydown", function(e){ if(e.key==="Enter") entrar(
 el("logout").addEventListener("click", function(){ el("empresa").classList.add("hide"); logout(); });
 el("load").addEventListener("click", load);
 el("empresa").addEventListener("change", function(){ if(el("empresa").value) load(); });
+el("consBtn").addEventListener("click", async function(){
+  var q = el("consPergunta").value.trim();
+  if(!q){ el("consPergunta").focus(); return; }
+  el("consResp").classList.remove("hide");
+  el("consResp").textContent = "O conselheiro está analisando os dados…";
+  try{
+    var r = await jsend("POST","/advisor/pergunta",{pergunta:q, persona:el("consPersona").value||null});
+    el("consResp").textContent = r.resposta;
+  }catch(e){ el("consResp").textContent = "Erro: "+e.message; }
+});
+el("consPergunta").addEventListener("keydown", function(e){ if(e.key==="Enter") el("consBtn").click(); });
+el("consCards").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-cons]"); if(!b) return;
+  el("consPersona").value = b.getAttribute("data-cons");
+  el("consPergunta").focus();
+  window.scrollTo(0,0);
+});
 el("okrAdd").addEventListener("click", novoObjetivo);
 el("fcaAdd").addEventListener("click", function(){ editorFca(null, el("fcaAdd").closest("header")); });
 el("userAdd").addEventListener("click", function(){ editorUsuario(null, el("userAdd").closest("header")); });
@@ -1382,6 +1525,11 @@ el("fca").addEventListener("click", function(e){
     jsend("DELETE","/fca/"+c.id).then(refreshFca)
       .catch(function(err){ window.alert("Não foi possível excluir: "+err.message); });
   }
+});
+el("checklist").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-goto]"); if(!b) return;
+  showTab(b.getAttribute("data-goto"));
+  window.scrollTo(0,0);
 });
 el("okrs").addEventListener("click", function(e){
   var b = e.target.closest("button.ib"); if(!b) return;

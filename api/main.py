@@ -992,22 +992,125 @@ def advisor_insight(tid: str = Depends(tenant_of)):
 
 class PerguntaIn(BaseModel):
     pergunta: str
+    persona: Optional[str] = None
 
 
 @app.post("/advisor/pergunta")
 def advisor_pergunta(body: PerguntaIn, tid: str = Depends(tenant_of)):
-    """2.2 — Converse com seus dados: pergunta livre respondida sobre os números."""
+    """2.2 — Converse com seus dados (opcionalmente na voz de um conselheiro)."""
     if not body.pergunta.strip():
         raise HTTPException(400, "Escreva a pergunta.")
+    if body.persona and body.persona not in advisor.PERSONAS:
+        raise HTTPException(400, "Conselheiro inválido.")
     contexto, _ = _contexto_tenant(tid)
     if not contexto:
         return {"fonte": "indisponivel",
                 "resposta": "Ainda não há dados suficientes para responder."}
-    texto = advisor.responder_pergunta(contexto, body.pergunta.strip())
+    texto = advisor.responder_pergunta(contexto, body.pergunta.strip(), body.persona)
     if texto:
         return {"fonte": "ia", "resposta": texto}
     return {"fonte": "indisponivel",
-            "resposta": "A IA do Advisor ainda não está ativa (configure a ANTHROPIC_API_KEY no servidor)."}
+            "resposta": "A IA do Conselho ainda não está ativa (configure a ANTHROPIC_API_KEY no servidor)."}
+
+
+@app.get("/conselho/pautas")
+def conselho_pautas(tid: str = Depends(tenant_of)):
+    """O Conselho BoardOS: pauta de cada conselheiro calculada dos dados reais."""
+    contexto, ult = _contexto_tenant(tid)
+    cats = []
+    cesta = None
+    clientes_identificados = 0
+    if ult:
+        with tenant_session(tid) as cur:
+            # categorias do último mês vs ano anterior
+            cur.execute(
+                """
+                SELECT c.nome, g.data, sum(g.faturamento_liq)
+                  FROM gold_venda_diaria g JOIN categoria c ON c.id = g.categoria_id
+                 WHERE date_trunc('month', g.data) IN (make_date(%s,%s,1), make_date(%s,%s,1))
+                 GROUP BY c.nome, g.data
+                """, (ult.year, ult.month, ult.year - 1, ult.month))
+            porc: dict = {}
+            for nome, d, fat in cur.fetchall():
+                porc.setdefault(nome, {"atual": [], "base": []})
+                rec = {"data": d, "faturamento_liq": float(fat), "cupons": 0, "itens": 0}
+                (porc[nome]["atual"] if d.year == ult.year else porc[nome]["base"]).append(rec)
+            for nome, v in porc.items():
+                fat = sum(r["faturamento_liq"] for r in v["atual"])
+                var = None
+                if v["atual"] and v["base"]:
+                    var = comparison.compare(v["atual"], v["base"])["var_ajustada"]
+                cats.append({"nome": nome, "faturamento": fat, "var": var})
+            cats.sort(key=lambda x: -x["faturamento"])
+            # cesta do mês (itens/cupom) atual vs ano anterior
+            cur.execute(
+                "SELECT date_trunc('year', data)::date, sum(itens)::float / NULLIF(sum(cupons),0) "
+                "FROM gold_venda_diaria WHERE categoria_id IS NULL "
+                "AND date_trunc('month', data) IN (make_date(%s,%s,1), make_date(%s,%s,1)) "
+                "GROUP BY 1 ORDER BY 1", (ult.year, ult.month, ult.year - 1, ult.month))
+            rr = cur.fetchall()
+            if rr:
+                cesta = {str(r[0])[:4]: (round(float(r[1]), 2) if r[1] else None) for r in rr}
+            cur.execute("SELECT count(DISTINCT cliente_id) FROM item_venda WHERE cliente_id IS NOT NULL")
+            clientes_identificados = int(cur.fetchone()[0])
+
+    def _pct(v):
+        return f"{v*100:+.1f}%" if v is not None else "s/ base"
+
+    pautas: dict = {}
+    P = advisor.PERSONAS
+    if contexto:
+        c = contexto["comparacao_yoy"]
+        metas_r = [m for m in contexto["metas"] if m["farol"] == "r"]
+        lojas_q = [l for l in contexto["lojas"] if (l.get("var_varejo_pct") or 0) <= -3]
+        pautas["estrategia"] = [
+            f"Mês {contexto['mes_referencia']}: civil {c['var_civil_pct']:+.1f}% × varejo {c['var_varejo_ajustada_pct']:+.1f}% (efeito calendário {c['efeito_calendario_pp']:+.1f}pp).",
+            (f"{len(metas_r)} meta(s) fora da rota — priorize: " + "; ".join(m["kr"] for m in metas_r[:2]))
+            if metas_r else "Metas do ano na rota — mantenha o ritmo.",
+            (f"Queda real em {len(lojas_q)} loja(s): " + ", ".join(l["nome"] for l in lojas_q[:3]))
+            if lojas_q else "Nenhuma loja com queda real relevante no mês.",
+        ]
+    if cats:
+        melhor = max((x for x in cats if x["var"] is not None), key=lambda x: x["var"], default=None)
+        pior = min((x for x in cats if x["var"] is not None), key=lambda x: x["var"], default=None)
+        lider = cats[0]
+        tot = sum(x["faturamento"] for x in cats) or 1
+        pautas["categorias"] = [
+            f"{lider['nome']} lidera o mix com {lider['faturamento']/tot*100:.0f}% do faturamento.",
+            (f"Destaque: {melhor['nome']} {_pct(melhor['var'])} vs. ano anterior — avalie mais espaço/frente.") if melhor else "",
+            (f"Atenção: {pior['nome']} {_pct(pior['var'])} — revise preço, sortimento e planograma.") if pior else "",
+        ]
+        pautas["trade"] = [
+            (f"Leve {pior['nome']} para o JBP: negocie verba, encarte e ação de recuperação com os fornecedores da categoria.") if pior else "Monte a agenda de JBP com os 3 maiores fornecedores.",
+            (f"{melhor['nome']} em alta — proponha ação casada (ponta de gôndola / combo) para acelerar com verba da indústria.") if melhor else "",
+            f"Calendário promocional: {len(contexto['proximos_feriados_e_datas']) if contexto else 0} data(s) sazonal(is) cadastrada(s) nos próximos 45 dias — planeje encarte por data.",
+        ]
+    if contexto:
+        c = contexto["comparacao_yoy"]
+        tk_a, tk_b = c.get("ticket_atual"), c.get("ticket_ano_anterior")
+        var_tk = ((tk_a / tk_b - 1) * 100) if (tk_a and tk_b) else None
+        cesta_txt = ""
+        if cesta and len(cesta) == 2:
+            anos = sorted(cesta)
+            cesta_txt = f"Cesta: {cesta[anos[1]]} itens/cupom vs {cesta[anos[0]]} no ano anterior."
+        pautas["clientes"] = [
+            (f"Ticket médio R$ {tk_a:.2f} ({var_tk:+.1f}% vs. ano anterior)." if var_tk is not None
+             else "Ticket médio ainda sem base de comparação."),
+            cesta_txt or "Cesta média em consolidação.",
+            ("Nenhum cliente identificado no cupom — ative CPF na nota/fidelidade para abrir frequência, churn e LTV."
+             if clientes_identificados == 0 else
+             f"{clientes_identificados} clientes identificados — hora de segmentar e ativar campanhas."),
+        ]
+        fat_mes = c["faturamento_total"]
+        pautas["receitas"] = [
+            f"Retail media: potencial estimado de R$ {fat_mes*0.005:,.0f}–{fat_mes*0.015:,.0f}/mês (benchmark de mercado: 0,5–1,5% do faturamento; estimativa).",
+            "Monetize o sell-out: relatórios por categoria para a indústria dentro do JBP.",
+            "Espaços vendáveis: encarte digital, mídia em tela no PDV e pontas de gôndola patrocinadas.",
+        ]
+    conselheiros = [{"id": k, "nome": v["nome"], "foco": v["foco"],
+                     "pauta": [x for x in pautas.get(k, ["Aguardando dados para montar a pauta."]) if x]}
+                    for k, v in P.items()]
+    return {"conselheiros": conselheiros}
 
 
 @app.get("/advisor/resumo-executivo")
