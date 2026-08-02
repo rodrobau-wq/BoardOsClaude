@@ -43,6 +43,45 @@ OKRS_DEMO = [
 ]
 
 
+# Categorias demo com participação típica de supermercado (soma = 1.0)
+CATEGORIAS = [("MERC", "Mercearia", 0.30), ("HORT", "Hortifrúti", 0.15),
+              ("ACOU", "Açougue", 0.15), ("BEB", "Bebidas", 0.14),
+              ("PAD", "Padaria", 0.10), ("LIMP", "Limpeza & Perfumaria", 0.16)]
+
+
+def seed_categorias_gold(tenant_id: str) -> None:
+    """Desdobra o gold total da loja em linhas por categoria (share + ruído
+    determinístico por dia/loja/categoria — assim cada categoria tem YoY próprio)."""
+    from boardos.ingestion import _get_or_create
+    with tenant_session(tenant_id) as cur:
+        ids = {}
+        for cod, nome, _ in CATEGORIAS:
+            ids[cod] = _get_or_create(cur, "categoria", cod,
+                                      {"nome": nome, "tenant_id": tenant_id})
+        cur.execute("DELETE FROM gold_venda_diaria WHERE categoria_id IS NOT NULL")
+        for cod, _nome, share in CATEGORIAS:
+            cur.execute(
+                """
+                INSERT INTO gold_venda_diaria
+                  (tenant_id, data, loja_id, categoria_id, faturamento_bruto,
+                   faturamento_liq, custo, margem, itens, cupons, qtd)
+                SELECT tenant_id, data, loja_id, %s,
+                       round(faturamento_bruto*%s*f,2), round(faturamento_liq*%s*f,2),
+                       round(custo*%s*f,2), round(margem*%s*f,2),
+                       greatest(1, round(itens*%s*f)), greatest(1, round(cupons*%s*f)),
+                       round(qtd*%s*f)
+                  FROM (SELECT g.*,
+                               0.86 + (abs(hashtext(g.data::text || g.loja_id::text || %s)) %% 280)/1000.0 AS f
+                          FROM gold_venda_diaria g WHERE g.categoria_id IS NULL) sub
+                ON CONFLICT (tenant_id, data, loja_id, categoria_id) DO UPDATE SET
+                  faturamento_bruto=EXCLUDED.faturamento_bruto,
+                  faturamento_liq=EXCLUDED.faturamento_liq, custo=EXCLUDED.custo,
+                  margem=EXCLUDED.margem, itens=EXCLUDED.itens,
+                  cupons=EXCLUDED.cupons, qtd=EXCLUDED.qtd
+                """,
+                (ids[cod], share, share, share, share, share, share, share, cod))
+
+
 def seed_okrs(tenant_id: str) -> None:
     with tenant_session(tenant_id) as cur:
         cur.execute("DELETE FROM okr_objetivo WHERE tenant_id = %s", (tenant_id,))
@@ -114,7 +153,8 @@ def main():
             continue
         res = crm.import_vendas_diarias_rows(tid, gen_vendas(perfil, salt * 97))
         seed_okrs(tid)
-        print(f"  {ext} ({tid}): {res['linhas']} linhas de gold + OKRs demo")
+        seed_categorias_gold(tid)
+        print(f"  {ext} ({tid}): {res['linhas']} linhas de gold + OKRs + categorias demo")
 
     # 4) usuários de login (senha com hash) — um CEO por empresa + super-admin
     with psycopg.connect(ADMIN_DSN, autocommit=True) as conn:

@@ -133,6 +133,17 @@ def main():
     st, _ = req("PUT", "/radar", token=tok, body={"notas": {"Financeiro": 7}})
     check("radar PUT", st == 200)
 
+    # Bloco 3: forecast + categorias
+    st, f = req("GET", "/forecast/mes?ano=2026&mes=8", token=tok)
+    check("forecast/mes 200 + soma bate", st == 200 and
+          abs(f.get("total_projetado", 0) - (f.get("total_realizado", 0) + f.get("total_previsto", 0))) < 0.05,
+          f"projetado={f.get('total_projetado')}")
+    st, cg = req("GET", "/categorias/resumo?ano=2026&mes=8", token=tok)
+    part_total = sum(c.get("participacao", 0) for c in cg.get("categorias", []))
+    check("categorias/resumo 200 + participações ~100%", st == 200 and
+          len(cg.get("categorias", [])) >= 4 and 0.95 <= part_total <= 1.05,
+          f"{len(cg.get('categorias', []))} categorias")
+
     st, a = req("POST", "/acoes", token=tok,
                 body={"oque": "TESTE smoke — remover", "quem": "QA", "status": "planejada"})
     check("acoes POST", st == 200 and a.get("id"))

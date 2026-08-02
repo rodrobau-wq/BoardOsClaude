@@ -73,6 +73,7 @@
   .legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
   .legend i{display:inline-block;width:16px;height:0;vertical-align:middle;margin-right:5px}
   .lg-a i{border-top:3px solid var(--accent)}.lg-p i{border-top:2px dashed var(--prioryr)}
+  .lg-f i{border-top:2px dashed var(--accent);opacity:.7}
   .okr-obj{padding:14px 0;border-top:1px solid var(--border)}
   .okr-obj:first-child{border-top:0;padding-top:0}
   .okr-obj h3{margin:0;font-size:14px}
@@ -292,7 +293,7 @@
 
     <section class="card">
       <header><h2>Vendas diárias</h2>
-        <div class="legend"><span class="lg-a"><i></i>Atual</span><span class="lg-p"><i></i>Ano anterior</span></div>
+        <div class="legend"><span class="lg-a"><i></i>Atual</span><span class="lg-p"><i></i>Ano anterior</span><span class="lg-f"><i></i>Projeção</span></div>
       </header>
       <div class="body">
         <svg class="chart" id="chart" viewBox="0 0 720 260" preserveAspectRatio="none"></svg>
@@ -305,6 +306,16 @@
       <div class="body" style="overflow-x:auto">
         <table class="tbl" id="lojasTbl">
           <thead><tr><th>Loja</th><th>Faturamento</th><th>vs. ano ant. — Civil</th><th>vs. ano ant. — Varejo</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>Categorias</h2><span class="sub">participação e comparação do mês</span></header>
+      <div class="body" style="overflow-x:auto">
+        <table class="tbl" id="catsTbl">
+          <thead><tr><th>Categoria</th><th>Faturamento</th><th>Part.</th><th>vs. ano ant. — Civil</th><th>vs. ano ant. — Varejo</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -397,8 +408,12 @@ async function load(){
     var atual = await jget("/kpi/diario?data_de="+ano+"-"+mm+"-01&data_ate="+ano+"-"+mm+"-"+ult);
     var ultB = new Date(ano-1, mes, 0).getDate();
     var base = await jget("/kpi/diario?data_de="+(ano-1)+"-"+mm+"-01&data_ate="+(ano-1)+"-"+mm+"-"+ultB);
-    last = {cmp, atual:atual.dias, base:base.dias};
+    var fcast = null;
+    try{ fcast = await jget("/forecast/mes?ano="+ano+"&mes="+mes); }catch(_){}
+    last = {cmp: cmp, atual: atual.dias, base: base.dias, fc: fcast};
     render();
+    try{ var cr = await jget("/categorias/resumo?ano="+ano+"&mes="+mes); renderCats(cr.categorias); }
+    catch(_){ renderCats([]); }
     try{ var ok = await jget("/okrs"); renderOkrs(ok.objetivos); }
     catch(_){ el("okrs").innerHTML='<span class="hint">Sem metas cadastradas.</span>'; }
     try{ var lr = await jget("/lojas/resumo?ano="+ano+"&mes="+mes); renderLojas(lr.lojas); }
@@ -444,13 +459,21 @@ function render(){
 
   // KPIs
   var k = el("kpis"); k.innerHTML="";
+  var fatSum=0, margSum=0, cupSum=0, itnSum=0;
+  last.atual.forEach(function(r){ fatSum+=+r.faturamento_liq; margSum+=+(r.margem||0);
+    cupSum+=+(r.cupons||0); itnSum+=+(r.itens||0); });
   var cards = [
     ["Faturamento (atual)", brl(c.total_atual)],
     ["vs. ano ant. — Civil", pct(c.var_civil), c.var_civil>=0?"up":"down"],
     ["vs. ano ant. — Varejo", pct(c.var_ajustada), c.var_ajustada>=0?"up":"down"],
     ["Efeito de calendário", pct(c.efeito_calendario)],
-    ["Ticket médio", c.ticket_atual? "R$ "+(+c.ticket_atual).toFixed(2) : "—"]
+    ["Ticket médio", c.ticket_atual? "R$ "+(+c.ticket_atual).toFixed(2) : "—"],
+    ["Margem bruta", fatSum? (margSum/fatSum*100).toFixed(1)+"%" : "—"],
+    ["Itens por cupom", cupSum? (itnSum/cupSum).toFixed(1) : "—"]
   ];
+  if(last.fc && last.fc.previsto && last.fc.previsto.length){
+    cards.push(["Projeção do mês ✦", brl(last.fc.total_projetado)]);
+  }
   cards.forEach(function(x){
     var d=document.createElement("div"); d.className="kpi";
     d.innerHTML='<div class="lbl">'+x[0]+'</div><div class="val num '+(x[2]||"")+'">'+x[1]+'</div>';
@@ -837,6 +860,23 @@ function renderLojas(lojas){
 }
 
 var okrCache = [];
+function renderCats(cats){
+  var tb = el("catsTbl").querySelector("tbody");
+  if(!cats || !cats.length){
+    tb.innerHTML = '<tr><td colspan="5" class="hint">Sem dados por categoria no período.</td></tr>'; return;
+  }
+  function delta(v){
+    if(v==null) return '<span class="hint">—</span>';
+    var cls = v>=0 ? "pg" : "pr";
+    return '<span class="'+cls+'" style="font-weight:600">'+(v>=0?"▲":"▼")+" "+pct(v)+"</span>";
+  }
+  tb.innerHTML = cats.map(function(cg){
+    return "<tr><td>"+cg.nome+"</td><td>"+brl(cg.faturamento)+"</td>"+
+      '<td class="num">'+(cg.participacao*100).toFixed(1)+"%</td>"+
+      "<td>"+delta(cg.var_civil)+"</td><td>"+delta(cg.var_ajustada)+"</td></tr>";
+  }).join("");
+}
+
 function renderOkrs(objetivos){
   okrCache = objetivos || [];
   var box = el("okrs");
@@ -894,8 +934,23 @@ function drawChart(){
       Cgr=cs.getPropertyValue("--grid").trim(), Cmu=cs.getPropertyValue("--muted").trim();
   var A=last.atual.map(function(r){return +r.faturamento_liq;});
   var B=priorSeries();
+  var F=null;
+  var fcst=last.fc;
+  if(fcst && fcst.previsto && fcst.previsto.length){
+    var cut=fcst.cutoff;
+    A=last.atual.map(function(r){ return r.data<=cut ? +r.faturamento_liq : null; });
+    F=last.atual.map(function(){ return null; });
+    fcst.previsto.forEach(function(p){
+      var idx=(+p.data.slice(8,10))-1;
+      while(F.length<=idx){ F.push(null); A.push(null); B.push(null); }
+      F[idx]=p.valor;
+    });
+    var cidx=(+cut.slice(8,10))-1;   // conecta a projeção ao último realizado
+    if(cidx>=0 && cidx<F.length && last.atual[cidx]) F[cidx]=+last.atual[cidx].faturamento_liq;
+  }
   var n=A.length; if(!n)return;
-  var all=A.concat(B.filter(function(v){return v!=null;})), max=Math.max.apply(null,all)*1.08;
+  var all=A.concat(B, F||[]).filter(function(v){return v!=null;});
+  var max=Math.max.apply(null,all)*1.08;
   var P={l:46,r:12,t:12,b:22},W=720,H=260,iw=W-P.l-P.r,ih=H-P.t-P.b;
   function X(i){return P.l+(i/(n-1))*iw;} function Y(v){return P.t+ih-(v/max)*ih;}
   for(var s=0;s<=4;s++){var y=P.t+ih-(ih*s/4),val=max*s/4;
@@ -903,6 +958,7 @@ function drawChart(){
     var tl=mk("text",{x:P.l-6,y:y+3,"text-anchor":"end",fill:Cmu,"font-size":9});tl.textContent=Math.round(val/1000);svg.appendChild(tl);}
   function line(arr,opt){var d="",st=false;for(var i=0;i<arr.length;i++){if(arr[i]==null){st=false;continue;}d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(arr[i]).toFixed(1)+" ";st=true;}return mk("path",Object.assign({d:d,fill:"none"},opt));}
   svg.appendChild(line(B,{stroke:Cpr,"stroke-width":2,"stroke-dasharray":"5 4","stroke-linecap":"round"}));
+  if(F) svg.appendChild(line(F,{stroke:Cac,"stroke-width":2,"stroke-dasharray":"3 5","stroke-linecap":"round","opacity":.75}));
   svg.appendChild(line(A,{stroke:Cac,"stroke-width":3,"stroke-linecap":"round","stroke-linejoin":"round"}));
 }
 

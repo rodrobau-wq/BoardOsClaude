@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from boardos import advisor, comparison, descoberta as desc  # noqa: E402
+from boardos import advisor, comparison, descoberta as desc, forecast as fc  # noqa: E402
 from boardos.auth import decode_token, hash_password, make_token, verify_password  # noqa: E402
 from boardos.db import platform_session, tenant_session  # noqa: E402
 
@@ -327,6 +327,7 @@ def kpi_diario(data_de: str, data_ate: str, tid: str = Depends(tenant_of)):
             """
             SELECT data,
                    sum(faturamento_liq) AS faturamento_liq,
+                   sum(margem) AS margem,
                    sum(cupons) AS cupons, sum(itens) AS itens,
                    max(dow_label) AS dow_label, bool_or(is_fim_semana) AS is_fim_semana,
                    max(retail_year) AS retail_year, max(retail_week) AS retail_week
@@ -341,6 +342,7 @@ def kpi_diario(data_de: str, data_ate: str, tid: str = Depends(tenant_of)):
         for r in rows:
             r["data"] = str(r["data"])
             r["faturamento_liq"] = float(r["faturamento_liq"])
+            r["margem"] = float(r["margem"]) if r["margem"] is not None else 0.0
     if not rows:
         raise HTTPException(404, "Sem dados no período.")
     return {"periodo": [data_de, data_ate], "dias": rows}
@@ -798,6 +800,77 @@ def advisor_insight(tid: str = Depends(tenant_of)):
     if texto:
         return {"fonte": "ia", "texto": texto}
     return {"fonte": "motor"}
+
+
+# -------------------------------------------- forecast + categorias
+@app.get("/forecast/mes")
+def forecast_mes_api(ano: int, mes: int, tid: str = Depends(tenant_of)):
+    """Projeção do restante do mês (média por dia-da-semana das últimas semanas).
+
+    cutoff = hoje (ou o fim do mês, se já fechou). previsto=[] quando não há
+    nada a projetar ou não há histórico suficiente.
+    """
+    import calendar as _cal
+    from datetime import date as _date, timedelta as _td
+    primeiro = _date(ano, mes, 1)
+    ultimo = _date(ano, mes, _cal.monthrange(ano, mes)[1])
+    cutoff = min(_date.today(), ultimo)
+    if cutoff < primeiro:
+        return {"cutoff": None, "realizado": [], "previsto": [],
+                "total_realizado": 0, "total_previsto": 0, "total_projetado": 0}
+    ini = primeiro - _td(days=42)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "SELECT data, sum(faturamento_liq) FROM gold_venda_diaria "
+            "WHERE categoria_id IS NULL AND data BETWEEN %s AND %s "
+            "GROUP BY data ORDER BY data", (ini, cutoff))
+        hist = [{"data": r[0], "faturamento_liq": float(r[1])} for r in cur.fetchall()]
+    r = fc.forecast_mes(hist, ano, mes, cutoff=cutoff)
+    return {
+        "cutoff": str(r["cutoff"]),
+        "realizado": [{"data": str(x["data"]), "valor": x["valor"]} for x in r["realizado"]],
+        "previsto": [{"data": str(x["data"]), "valor": x["valor"]} for x in r["previsto"]],
+        "total_realizado": r["total_realizado"],
+        "total_previsto": r["total_previsto"],
+        "total_projetado": r["total_projetado"],
+    }
+
+
+@app.get("/categorias/resumo")
+def categorias_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
+    """Drill-down por categoria no mês: faturamento, participação e YoY."""
+    with tenant_session(tid) as cur:
+        cur.execute(
+            """
+            SELECT c.id, c.nome, g.data, sum(g.faturamento_liq), sum(g.cupons), sum(g.itens)
+              FROM gold_venda_diaria g JOIN categoria c ON c.id = g.categoria_id
+             WHERE date_trunc('month', g.data) IN (make_date(%s,%s,1), make_date(%s,%s,1))
+             GROUP BY c.id, c.nome, g.data ORDER BY c.nome, g.data
+            """,
+            (ano, mes, ano - 1, mes))
+        por_cat: dict = {}
+        for cid, nome, d, fat, cup, itn in cur.fetchall():
+            key = str(cid)
+            por_cat.setdefault(key, {"nome": nome, "atual": [], "base": []})
+            rec = {"data": d, "faturamento_liq": float(fat),
+                   "cupons": int(cup), "itens": int(itn)}
+            (por_cat[key]["atual"] if d.year == ano else por_cat[key]["base"]).append(rec)
+
+    cats = []
+    for v in por_cat.values():
+        fat = sum(r["faturamento_liq"] for r in v["atual"])
+        item = {"nome": v["nome"], "faturamento": round(fat, 2),
+                "var_civil": None, "var_ajustada": None}
+        if v["atual"] and v["base"]:
+            r = comparison.compare(v["atual"], v["base"])
+            item["var_civil"] = r["var_civil"]
+            item["var_ajustada"] = r["var_ajustada"]
+        cats.append(item)
+    total = sum(c["faturamento"] for c in cats) or 1.0
+    for c in cats:
+        c["participacao"] = round(c["faturamento"] / total, 4)
+    cats.sort(key=lambda x: -x["faturamento"])
+    return {"periodo": f"{ano}-{mes:02d}", "categorias": cats}
 
 
 # ------------------------------------------------- alertas + Ciclo FCA
