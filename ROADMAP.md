@@ -1,7 +1,7 @@
 # BoardOS — Roadmap Total (para aprovação)
 
 > Data: 2026-08-02 · Este é o plano completo do que falta para o SaaS.
-> Status: aguardando aprovação do fundador.
+> Status: aprovado e EXECUTADO — restam apenas itens com dependência do fundador (ver fim).
 
 ## ✅ Já entregue (no ar em produção)
 
@@ -21,6 +21,10 @@
 | Drill-down | Resumo por loja (civil/varejo) + **por categoria com participação** (3.2 ✅) |
 | KPIs | **Margem bruta e itens por cupom** no painel (3.1 parcial ✅) |
 | Forecast | **Projeção do restante do mês** (média por dia-da-semana) no gráfico + card (3.3 ✅) |
+| Onboarding | **Upload de CSV pela tela** com mapeador de colunas e sugestão automática (4.4 ✅) |
+| IA (completa) | **Converse com seus dados** (2.2 ✅) e **Resumo executivo do board** (2.3 ✅) — com fallback sem chave |
+| Calendário | **Feriados e datas sazonais** por rede, alimentando o Advisor (3.4 ✅) |
+| Comercial | **Site de produto** no ar — boardos-site.onrender.com (4.5 ✅) |
 | Deploy | Render (API + painel + Postgres pago), GitHub CI por push |
 | CRM | Conector com layout assumido + onboarding demo (aguarda amostra real) |
 
