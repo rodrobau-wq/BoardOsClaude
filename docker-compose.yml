@@ -1,0 +1,22 @@
+# Sobe o Postgres com PostGIS para o BoardOS (dev local).
+#   docker compose up -d
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: boardos-db
+    environment:
+      POSTGRES_DB: boardos
+      POSTGRES_USER: boardos_admin
+      POSTGRES_PASSWORD: change-me-admin
+    ports:
+      - "5432:5432"
+    volumes:
+      - boardos_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U boardos_admin -d boardos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  boardos_pg:

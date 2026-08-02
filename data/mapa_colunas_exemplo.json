@@ -1,0 +1,15 @@
+{
+  "_comment": "De campo canônico -> nome da coluna no CSV do cliente. Ver boardos/mapping.py",
+  "data": "Data",
+  "loja_codigo": "Loja",
+  "cupom_id": "Cupom",
+  "seq_item": "Seq",
+  "cliente_id": "Cliente",
+  "sku_codigo": "SKU",
+  "categoria_codigo": "Categoria",
+  "qtd": "Qtd",
+  "valor_bruto": "ValorBruto",
+  "desconto": "Desconto",
+  "valor_liquido": "ValorLiquido",
+  "custo": "Custo"
+}

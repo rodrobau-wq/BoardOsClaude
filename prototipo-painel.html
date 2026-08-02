@@ -1,0 +1,636 @@
+<title>BoardOS — Painel Estratégico (protótipo)</title>
+<style>
+  :root {
+    --ground:#F5F7FC; --surface:#FFFFFF; --surface-2:#FAFBFE;
+    --ink:#0F1B2D; --ink-2:#33425C; --muted:#5B6B85; --faint:#8A97AE;
+    --border:#E4E9F3; --border-strong:#D3DAE8;
+    --accent:#2D5BE3; --accent-strong:#1E3F9E; --accent-soft:#EAF0FD;
+    --good:#12855A; --good-soft:#E4F4EC;
+    --warn:#B5790A; --warn-soft:#FBF1DC;
+    --crit:#CB3A50; --crit-soft:#FBE7EB;
+    --shadow:0 1px 2px rgba(15,27,45,.05), 0 6px 20px rgba(15,27,45,.06);
+    --grid:#EEF1F8; --prioryr:#9AA6BD;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --ground:#0A0E16; --surface:#141B27; --surface-2:#111824;
+      --ink:#E9EEF8; --ink-2:#C4CEDF; --muted:#8B9AB5; --faint:#66748E;
+      --border:#232D3E; --border-strong:#2E3A4E;
+      --accent:#5A86F5; --accent-strong:#7EA0F8; --accent-soft:#182338;
+      --good:#3CB983; --good-soft:#12281F;
+      --warn:#E0A93A; --warn-soft:#2C2411;
+      --crit:#F0697F; --crit-soft:#2E1620;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+      --grid:#1D2634; --prioryr:#61708B;
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0A0E16; --surface:#141B27; --surface-2:#111824;
+    --ink:#E9EEF8; --ink-2:#C4CEDF; --muted:#8B9AB5; --faint:#66748E;
+    --border:#232D3E; --border-strong:#2E3A4E;
+    --accent:#5A86F5; --accent-strong:#7EA0F8; --accent-soft:#182338;
+    --good:#3CB983; --good-soft:#12281F;
+    --warn:#E0A93A; --warn-soft:#2C2411;
+    --crit:#F0697F; --crit-soft:#2E1620;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    --grid:#1D2634; --prioryr:#61708B;
+  }
+  :root[data-theme="light"]{
+    --ground:#F5F7FC; --surface:#FFFFFF; --surface-2:#FAFBFE;
+    --ink:#0F1B2D; --ink-2:#33425C; --muted:#5B6B85; --faint:#8A97AE;
+    --border:#E4E9F3; --border-strong:#D3DAE8;
+    --accent:#2D5BE3; --accent-strong:#1E3F9E; --accent-soft:#EAF0FD;
+    --good:#12855A; --good-soft:#E4F4EC;
+    --warn:#B5790A; --warn-soft:#FBF1DC;
+    --crit:#CB3A50; --crit-soft:#FBE7EB;
+    --shadow:0 1px 2px rgba(15,27,45,.05), 0 6px 20px rgba(15,27,45,.06);
+    --grid:#EEF1F8; --prioryr:#9AA6BD;
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--font);
+    font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* layout shell */
+  .app{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+  .side{background:var(--surface);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;gap:4px;padding:18px 14px;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
+  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+    display:grid;place-items:center;color:#fff;font-weight:700;font-size:15px;letter-spacing:.5px}
+  .brand b{font-size:15px;letter-spacing:-.2px}
+  .brand small{display:block;color:var(--muted);font-size:11px;font-weight:500;letter-spacing:.3px}
+  .nav{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+  .nav button{all:unset;cursor:pointer;display:flex;align-items:center;gap:11px;padding:9px 11px;
+    border-radius:9px;color:var(--ink-2);font-size:13.5px;font-weight:500}
+  .nav button:hover{background:var(--surface-2)}
+  .nav button.active{background:var(--accent-soft);color:var(--accent-strong);font-weight:600}
+  .nav button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .nav .ico{width:18px;text-align:center;opacity:.85}
+  .side .foot{margin-top:auto;border-top:1px solid var(--border);padding-top:12px;
+    display:flex;align-items:center;gap:10px;color:var(--muted);font-size:12px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent-soft);
+    color:var(--accent-strong);display:grid;place-items:center;font-weight:700;font-size:12px}
+
+  main{display:flex;flex-direction:column;min-width:0}
+
+  /* topbar */
+  .top{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--ground) 82%, transparent);
+    backdrop-filter:blur(8px);border-bottom:1px solid var(--border);
+    display:flex;align-items:center;gap:14px;padding:12px 26px;flex-wrap:wrap}
+  .top h1{font-size:16px;margin:0;letter-spacing:-.3px}
+  .top .spacer{flex:1}
+  .selctl{display:flex;align-items:center;gap:7px;background:var(--surface);border:1px solid var(--border);
+    padding:7px 11px;border-radius:9px;font-size:13px;color:var(--ink-2);cursor:pointer;font-weight:500}
+  .selctl .k{color:var(--faint);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .selctl:hover{border-color:var(--border-strong)}
+
+  /* segmented civil/varejo */
+  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px}
+  .seg button{all:unset;cursor:pointer;padding:6px 13px;border-radius:7px;font-size:12.5px;font-weight:600;
+    color:var(--muted);display:flex;align-items:center;gap:6px}
+  .seg button.on{background:var(--surface);color:var(--accent-strong);box-shadow:var(--shadow)}
+  .seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .seg .dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.6}
+  .seg button.on .dot{opacity:1}
+
+  .iconbtn{all:unset;cursor:pointer;width:36px;height:36px;border-radius:9px;border:1px solid var(--border);
+    background:var(--surface);display:grid;place-items:center;color:var(--ink-2);font-size:15px}
+  .iconbtn:hover{border-color:var(--border-strong)}
+  .iconbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  .wrap{padding:22px 26px 40px;display:flex;flex-direction:column;gap:18px;max-width:1320px}
+
+  /* kpi strip */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(198px,1fr));gap:14px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 16px;
+    box-shadow:var(--shadow);display:flex;flex-direction:column;gap:9px;position:relative;overflow:hidden}
+  .kpi .lbl{color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.2px;display:flex;justify-content:space-between;align-items:center}
+  .kpi .val{font-size:27px;font-weight:700;letter-spacing:-.6px}
+  .kpi .val small{font-size:14px;font-weight:600;color:var(--muted);margin-left:2px}
+  .kpi .cmp{display:flex;gap:8px;flex-wrap:wrap;font-size:12px}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;font-weight:600;font-size:11.5px}
+  .chip .cap{color:var(--faint);font-weight:600}
+  .up{color:var(--good);background:var(--good-soft)}
+  .down{color:var(--crit);background:var(--crit-soft)}
+  .flat{color:var(--muted);background:var(--surface-2)}
+  .farol{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.2px;text-transform:uppercase}
+  .farol .led{width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 3px color-mix(in srgb,currentColor 18%,transparent)}
+  .farol.g{color:var(--good)} .farol.a{color:var(--warn)} .farol.r{color:var(--crit)}
+
+  /* grids */
+  .cols{display:grid;grid-template-columns:1.55fr 1fr;gap:18px}
+  @media(max-width:1000px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow)}
+  .card > header{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:15px 17px;border-bottom:1px solid var(--border)}
+  .card > header h2{margin:0;font-size:14.5px;letter-spacing:-.2px}
+  .card > header .sub{color:var(--muted);font-size:12px;font-weight:500}
+  .card .body{padding:16px 17px}
+
+  .legend{display:flex;gap:15px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:500}
+  .legend i{display:inline-block;width:18px;height:0;vertical-align:middle;margin-right:6px}
+  .lg-actual i{border-top:3px solid var(--accent)}
+  .lg-prior i{border-top:2px dashed var(--prioryr)}
+  .lg-fc i{border-top:2px dashed var(--accent);opacity:.75}
+
+  /* chart */
+  .chartwrap{position:relative}
+  svg.chart{display:block;width:100%;height:auto}
+  .tt{position:absolute;pointer-events:none;background:var(--surface);border:1px solid var(--border-strong);
+    border-radius:10px;box-shadow:var(--shadow);padding:9px 11px;font-size:12px;min-width:150px;opacity:0;transform:translateY(-4px);
+    transition:opacity .1s;z-index:3}
+  .tt .d{color:var(--muted);font-weight:600;margin-bottom:5px;font-size:11px}
+  .tt .row{display:flex;justify-content:space-between;gap:14px;align-items:center}
+  .tt .row b{font-variant-numeric:tabular-nums}
+  .tt .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:middle}
+
+  /* okr list */
+  .okr{display:flex;flex-direction:column;gap:15px}
+  .okr .item{display:flex;flex-direction:column;gap:7px}
+  .okr .top-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .okr .name{font-weight:600;font-size:13.5px}
+  .okr .pct{font-variant-numeric:tabular-nums;font-weight:700;font-size:13px}
+  .bar{height:7px;border-radius:6px;background:var(--surface-2);overflow:hidden;border:1px solid var(--border)}
+  .bar > span{display:block;height:100%;border-radius:6px}
+  .okr .meta{display:flex;justify-content:space-between;color:var(--muted);font-size:11.5px}
+
+  /* advisor */
+  .advisor .msg{display:flex;gap:11px}
+  .advisor .ai{width:30px;height:30px;border-radius:9px;flex:none;background:linear-gradient(135deg,var(--accent),var(--accent-strong));
+    color:#fff;display:grid;place-items:center;font-size:15px}
+  .advisor p{margin:0 0 8px}
+  .advisor .fca{display:flex;flex-direction:column;gap:5px;margin-top:4px;font-size:12.5px}
+  .advisor .fca .t{display:flex;gap:8px}
+  .advisor .fca .k{flex:none;width:52px;color:var(--faint);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;padding-top:1px}
+
+  /* alerts */
+  .alerts{display:flex;flex-direction:column;gap:9px}
+  .alert{display:flex;gap:11px;align-items:flex-start;padding:11px 12px;border-radius:11px;border:1px solid var(--border)}
+  .alert.r{background:var(--crit-soft);border-color:color-mix(in srgb,var(--crit) 25%,transparent)}
+  .alert.a{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 25%,transparent)}
+  .alert .ic{flex:none;font-size:15px}
+  .alert .tx{font-size:12.5px}
+  .alert .tx b{display:block;margin-bottom:1px;font-size:13px}
+  .alert.r .ic{color:var(--crit)} .alert.a .ic{color:var(--warn)}
+
+  /* explainer */
+  .explain{background:linear-gradient(180deg,var(--accent-soft),transparent);border:1px solid var(--border);
+    border-radius:14px;padding:18px 19px;display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+  .explain .big{display:flex;gap:26px}
+  .explain .stat{display:flex;flex-direction:column;gap:2px}
+  .explain .stat .k{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
+  .explain .stat .v{font-size:26px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  .explain .txt{color:var(--ink-2);font-size:13.5px;max-width:62ch}
+  .explain .txt b{color:var(--ink)}
+  .vsdiv{width:1px;background:var(--border-strong);align-self:stretch;margin:2px 0}
+
+  /* indicadores table */
+  .tablecard{overflow:hidden}
+  .tbl-scroll{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:13px}
+  th,td{text-align:right;padding:11px 14px;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface)}
+  thead th{color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;
+    border-bottom:1px solid var(--border);background:var(--surface-2)}
+  thead th:first-child{background:var(--surface-2)}
+  tbody tr{border-bottom:1px solid var(--border)}
+  tbody tr:hover td{background:var(--surface-2)}
+  tbody tr:hover td:first-child{background:var(--surface-2)}
+  td .num{font-variant-numeric:tabular-nums}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:11px}
+  .pill .led{width:8px;height:8px;border-radius:50%}
+  .pill.g{color:var(--good)} .pill.a{color:var(--warn)} .pill.r{color:var(--crit)}
+  .delta{font-variant-numeric:tabular-nums;font-weight:600}
+  .delta.p{color:var(--good)} .delta.n{color:var(--crit)}
+
+  .hide{display:none !important}
+  .hint{color:var(--faint);font-size:11.5px;font-weight:500}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+  @media(max-width:720px){.app{grid-template-columns:1fr}.side{display:none}}
+</style>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo">B</div>
+      <div><b>BoardOS</b><small>Supermercados Aurora</small></div>
+    </div>
+    <nav class="nav" id="nav">
+      <button class="active" data-view="inicio"><span class="ico">◧</span> Início</button>
+      <button data-view="indicadores"><span class="ico">▤</span> Indicadores</button>
+      <button data-view="soon" title="No protótipo, foco em Início e Indicadores"><span class="ico">◎</span> Plano</button>
+      <button data-view="soon"><span class="ico">✦</span> Advisor</button>
+      <button data-view="soon"><span class="ico">⚙</span> Configuração</button>
+    </nav>
+    <div class="foot">
+      <div class="avatar">RB</div>
+      <div><div style="color:var(--ink-2);font-weight:600">Rodrigo B.</div>CEO · rede toda</div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="top">
+      <h1 id="viewTitle">Painel Estratégico</h1>
+      <div class="spacer"></div>
+      <button class="selctl" title="Protótipo"><span class="k">Escopo</span> Rede toda ▾</button>
+      <button class="selctl" title="Protótipo"><span class="k">Período</span> Agosto 2026 ▾</button>
+      <div class="seg" role="group" aria-label="Calendário de comparação">
+        <button id="segCivil" class="on" aria-pressed="true"><span class="dot"></span>Civil</button>
+        <button id="segVarejo" aria-pressed="false"><span class="dot"></span>Varejo</button>
+      </div>
+      <button class="iconbtn" id="themeBtn" title="Alternar tema" aria-label="Alternar tema">◐</button>
+    </div>
+
+    <!-- ===== VIEW: INÍCIO ===== -->
+    <section class="wrap" id="view-inicio">
+      <div class="kpis" id="kpis"></div>
+
+      <div class="cols">
+        <div class="card">
+          <header>
+            <div>
+              <h2>Vendas diárias — Agosto 2026</h2>
+              <div class="sub">Realizado, ano anterior <span id="alignNote">(mesma data)</span> e projeção</div>
+            </div>
+            <div class="legend">
+              <span class="lg-actual"><i></i>Atual</span>
+              <span class="lg-prior"><i></i>Ano anterior</span>
+              <span class="lg-fc"><i></i>Projeção</span>
+            </div>
+          </header>
+          <div class="body">
+            <div class="chartwrap" id="chartwrap">
+              <svg class="chart" id="chart" viewBox="0 0 720 300" preserveAspectRatio="none" role="img"
+                   aria-label="Vendas diárias de agosto com linha do ano anterior e projeção"></svg>
+              <div class="tt" id="tt"></div>
+            </div>
+            <div class="hint" style="margin-top:8px" id="chartHint"></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div class="card">
+            <header><h2>Metas do ano (OKRs)</h2><span class="sub">2026</span></header>
+            <div class="body okr" id="okr"></div>
+          </div>
+
+          <div class="card advisor">
+            <header><h2>Resumo do Advisor</h2><span class="sub">✦ IA</span></header>
+            <div class="body">
+              <div class="msg">
+                <div class="ai">✦</div>
+                <div id="advisorText"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header><h2>Precisa de atenção</h2><span class="sub">2 desvios no vermelho</span></header>
+        <div class="body alerts">
+          <div class="alert r">
+            <div class="ic">▲</div>
+            <div class="tx"><b>Ruptura acima do limite — Loja Centro</b>
+              6,4% no fim de semana (limite 5%). Categorias mais afetadas: hortifrúti e bebidas.</div>
+          </div>
+          <div class="alert a">
+            <div class="ic">◆</div>
+            <div class="tx"><b>Margem de mercearia em queda — 3ª semana seguida</b>
+              21,4% → 20,1%. Possível reação a preço de concorrente na região.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="explain" id="explain"></div>
+    </section>
+
+    <!-- ===== VIEW: INDICADORES ===== -->
+    <section class="wrap hide" id="view-indicadores">
+      <div class="card tablecard">
+        <header>
+          <div><h2>Indicadores por loja</h2><div class="sub" id="tblSub"></div></div>
+          <div class="hint">Comparação: <b id="tblBasis">civil</b> · variação ajustada por calendário</div>
+        </header>
+        <div class="tbl-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Loja</th><th>Faturamento</th><th>vs. ano ant.</th>
+                <th>Margem</th><th>Ruptura</th><th>Ticket</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="tblBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="hint">Protótipo com dados fictícios. O toggle Civil ↔ Varejo no topo muda a coluna “vs. ano anterior”.</p>
+    </section>
+
+    <!-- ===== VIEW: SOON ===== -->
+    <section class="wrap hide" id="view-soon">
+      <div class="card"><div class="body" style="padding:40px;text-align:center;color:var(--muted)">
+        Fora do escopo deste protótipo — foco em <b style="color:var(--ink)">Início</b> e <b style="color:var(--ink)">Indicadores</b>.
+      </div></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var root=document.documentElement;
+
+  /* ---------- theme ---------- */
+  document.getElementById('themeBtn').addEventListener('click',function(){
+    var cur=root.getAttribute('data-theme');
+    var sysDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var isDark = cur? cur==='dark' : sysDark;
+    root.setAttribute('data-theme', isDark?'light':'dark');
+    draw();
+  });
+
+  /* ---------- data (fictional) ---------- */
+  // 31 days of August 2026. Day 1 = Saturday (so month has 5 Sat, 5 Sun).
+  var DOW=['S','D','2','3','4','5','6']; // idx0=Sat
+  function dowOf(day){ return (day-1)%7; }         // 0=Sat,1=Sun,...
+  function isWeekend(day){ var d=dowOf(day); return d===0||d===1; }
+  var TODAY=20; // realized through day 20, forecast after
+
+  // deterministic pseudo-random
+  function rng(seed){ return function(){ seed=(seed*1664525+1013904223)&0xffffffff; return ((seed>>>8)/0x1000000); }; }
+  var r=rng(42);
+  var base=[], prior=[];
+  for(var day=1; day<=31; day++){
+    var wk = isWeekend(day)? 1.62 : 1.0;
+    var payday = (day<=3||day>=28)? 1.10 : 1.0;
+    var noise = 0.92 + r()*0.16;
+    base.push(Math.round(150*wk*payday*noise));      // R$ thousands
+    var pn = 0.90 + r()*0.16;
+    prior.push(Math.round(150*wk*payday*pn*0.965));  // prior year ~3.5% lower on comparable days
+  }
+  // Prior year, retail-week aligned: shift by +1 day (retail weeks start same weekday).
+  var priorVarejo=[prior[prior.length-1]].concat(prior.slice(0,prior.length-1));
+
+  var actual=base.map(function(v,i){ return i<TODAY? v : null; });
+  var forecast=base.map(function(v,i){ return i>=TODAY-1? v : null; }); // connect at day 20
+
+  /* ---------- state ---------- */
+  var basis='civil';
+  function priorSeries(){ return basis==='civil'? prior : priorVarejo; }
+
+  /* aggregates for the Civil vs Varejo differentiator */
+  var AGG={
+    civil:  {fat:'−2,1%', dir:'down', ticket:'+3,4%', tdir:'up', margin:'−0,8pp', mdir:'down'},
+    varejo: {fat:'+3,4%', dir:'up',   ticket:'+3,4%', tdir:'up', margin:'−0,3pp', mdir:'down'}
+  };
+
+  /* ---------- KPI cards ---------- */
+  var KPIS=[
+    {lbl:'Faturamento (mês)', val:'R$ 4,82', unit:'mi', farol:'g', ftxt:'No alvo',
+      key:'fat', civilCmp:AGG.civil.fat, civilDir:AGG.civil.dir, varejoCmp:AGG.varejo.fat, varejoDir:AGG.varejo.dir},
+    {lbl:'Margem bruta', val:'21,4', unit:'%', farol:'a', ftxt:'Atenção',
+      key:'margin', civilCmp:AGG.civil.margin, civilDir:'down', varejoCmp:AGG.varejo.margin, varejoDir:'down'},
+    {lbl:'Ruptura', val:'4,8', unit:'%', farol:'a', ftxt:'Atenção', invert:true,
+      key:'rup', civilCmp:'+0,6pp', civilDir:'down', varejoCmp:'+0,5pp', varejoDir:'down'},
+    {lbl:'Ticket médio', val:'R$ 58,30', unit:'', farol:'g', ftxt:'No alvo',
+      key:'ticket', civilCmp:AGG.civil.ticket, civilDir:'up', varejoCmp:AGG.varejo.ticket, varejoDir:'up'},
+    {lbl:'Itens por cupom', val:'8,2', unit:'', farol:'g', ftxt:'No alvo',
+      key:'cesta', civilCmp:'+1,1%', civilDir:'up', varejoCmp:'+1,3%', varejoDir:'up'}
+  ];
+  function renderKPIs(){
+    var el=document.getElementById('kpis'); el.innerHTML='';
+    KPIS.forEach(function(k){
+      var cmp = basis==='civil'? k.civilCmp : k.varejoCmp;
+      var dir = basis==='civil'? k.civilDir : k.varejoDir;
+      var cls = dir==='up'?'up':dir==='down'?'down':'flat';
+      var arrow = dir==='up'?'▲':dir==='down'?'▼':'—';
+      var d=document.createElement('div'); d.className='kpi';
+      d.innerHTML =
+        '<div class="lbl">'+k.lbl+
+          '<span class="farol '+k.farol+'"><span class="led"></span>'+k.ftxt+'</span></div>'+
+        '<div class="val num">'+k.val+(k.unit?'<small>'+k.unit+'</small>':'')+'</div>'+
+        '<div class="cmp"><span class="chip '+cls+'">'+arrow+' '+cmp+
+          '</span><span class="cap" style="align-self:center">vs. ano ant. ('+basis+')</span></div>';
+      el.appendChild(d);
+    });
+  }
+
+  /* ---------- OKRs ---------- */
+  var OKRS=[
+    {name:'Faturamento +8% no ano', pct:62, color:'var(--accent)', meta:'R$ 58,4 mi / R$ 62,0 mi', st:'g'},
+    {name:'Margem bruta ≥ 22%', pct:44, color:'var(--warn)', meta:'21,4% / 22,0%', st:'a'},
+    {name:'Ruptura ≤ 3%', pct:28, color:'var(--crit)', meta:'4,8% / 3,0%', st:'r'},
+    {name:'Base fidelidade +15 mil', pct:71, color:'var(--good)', meta:'10,6 mil / 15 mil', st:'g'}
+  ];
+  function renderOKR(){
+    var el=document.getElementById('okr'); el.innerHTML='';
+    OKRS.forEach(function(o){
+      var d=document.createElement('div'); d.className='item';
+      d.innerHTML='<div class="top-row"><span class="name">'+o.name+'</span>'+
+        '<span class="pct num" style="color:'+o.color+'">'+o.pct+'%</span></div>'+
+        '<div class="bar"><span style="width:'+o.pct+'%;background:'+o.color+'"></span></div>'+
+        '<div class="meta"><span>'+o.meta+'</span><span class="pill '+o.st+'"><span class="led" style="background:currentColor"></span>'+
+          (o.st==='g'?'No caminho':o.st==='a'?'Atenção':'Fora')+'</span></div>';
+      el.appendChild(d);
+    });
+  }
+
+  /* ---------- Advisor + explainer (basis-aware) ---------- */
+  function renderNarrative(){
+    var adv=document.getElementById('advisorText');
+    if(basis==='civil'){
+      adv.innerHTML='<p>No fechamento do mês (calendário civil) o faturamento está <b>2,1% abaixo</b> '+
+        'de agosto/2025. Mas cuidado: parte disso é <b>composição de calendário</b> — troque para a lente '+
+        '<b>Varejo</b> para ver a venda comparável.</p>'+
+        '<div class="fca">'+
+          '<div class="t"><span class="k">Fato</span><span>Faturamento civil −2,1% vs. ano anterior.</span></div>'+
+          '<div class="t"><span class="k">Causa</span><span>Agosto/2026 teve <b>1 sábado a menos</b> que 2025; ruptura de fim de semana na Loja Centro.</span></div>'+
+          '<div class="t"><span class="k">Ação</span><span>Reforçar reposição de hortifrúti/bebidas nos fins de semana; comparar pela lente Varejo.</span></div>'+
+        '</div>';
+    } else {
+      adv.innerHTML='<p>Em <b>venda comparável</b> (calendário de varejo, semanas alinhadas) a rede <b>cresceu 3,4%</b> '+
+        'sobre o mesmo período de 2025. A queda que aparecia no civil era <b>efeito de calendário</b>, não de desempenho.</p>'+
+        '<div class="fca">'+
+          '<div class="t"><span class="k">Fato</span><span>Venda comparável (varejo) +3,4% vs. ano anterior.</span></div>'+
+          '<div class="t"><span class="k">Causa</span><span>Crescimento real de ticket (+3,4%) e cesta (+1,3%); calendário civil escondia o ganho.</span></div>'+
+          '<div class="t"><span class="k">Ação</span><span>Manter rota; atacar apenas a ruptura da Loja Centro (é desvio real).</span></div>'+
+        '</div>';
+    }
+
+    var ex=document.getElementById('explain');
+    ex.innerHTML=
+      '<div class="big">'+
+        '<div class="stat"><span class="k">Civil (dinheiro)</span><span class="v" style="color:var(--crit)">−2,1%</span><span class="hint">4 sábados · fecha no mês</span></div>'+
+        '<div class="vsdiv"></div>'+
+        '<div class="stat"><span class="k">Varejo (demanda)</span><span class="v" style="color:var(--good)">+3,4%</span><span class="hint">semanas alinhadas</span></div>'+
+      '</div>'+
+      '<div class="txt"><b>Calendário duplo.</b> O mês fecha no calendário civil (faturamento e despesas), mas a '+
+      'comparação de venda usa semanas de varejo alinhadas ao ano anterior. Assim, um mês com '+
+      '<b>um sábado a menos</b> não vira “queda” — o BoardOS mostra as duas lentes e explica a diferença. '+
+      'Você está vendo agora a lente <b>'+(basis==='civil'?'Civil':'Varejo')+'</b>.</div>';
+  }
+
+  /* ---------- chart (SVG) ---------- */
+  var VB={w:720,h:300}, PAD={l:44,r:14,t:16,b:26};
+  function fmtK(v){ return 'R$ '+ (v).toLocaleString('pt-BR') + ' mil'; }
+  function draw(){
+    var svg=document.getElementById('chart');
+    var cs=getComputedStyle(document.body);
+    var C={
+      accent:cs.getPropertyValue('--accent').trim(),
+      prior:cs.getPropertyValue('--prioryr').trim(),
+      grid:cs.getPropertyValue('--grid').trim(),
+      muted:cs.getPropertyValue('--muted').trim(),
+      surface:cs.getPropertyValue('--surface').trim(),
+      ink:cs.getPropertyValue('--ink').trim()
+    };
+    var pr=priorSeries();
+    var all=base.concat(pr).filter(function(v){return v!=null;});
+    var max=Math.max.apply(null,all)*1.08, min=0;
+    var iw=VB.w-PAD.l-PAD.r, ih=VB.h-PAD.t-PAD.b, n=31;
+    function X(i){ return PAD.l + (i/(n-1))*iw; }
+    function Y(v){ return PAD.t + ih - ((v-min)/(max-min))*ih; }
+
+    var svgns='http://www.w3.org/2000/svg';
+    while(svg.firstChild) svg.removeChild(svg.firstChild);
+    function mk(t,a){ var e=document.createElementNS(svgns,t); for(var k in a) e.setAttribute(k,a[k]); return e; }
+
+    // gridlines + y labels
+    var steps=4;
+    for(var s=0;s<=steps;s++){
+      var val=min+(max-min)*s/steps, y=Y(val);
+      svg.appendChild(mk('line',{x1:PAD.l,y1:y,x2:VB.w-PAD.r,y2:y,stroke:C.grid,'stroke-width':1}));
+      var tl=mk('text',{x:PAD.l-8,y:y+3,'text-anchor':'end',fill:C.muted,'font-size':10});
+      tl.textContent=Math.round(val); svg.appendChild(tl);
+    }
+    // x labels (weekly)
+    for(var d=0; d<n; d+=3){
+      var tx=mk('text',{x:X(d),y:VB.h-8,'text-anchor':'middle',fill:C.muted,'font-size':10});
+      tx.textContent=(d+1); svg.appendChild(tx);
+    }
+
+    function path(series,opt){
+      var dstr='', started=false;
+      for(var i=0;i<n;i++){ if(series[i]==null) continue;
+        dstr+=(started?'L':'M')+X(i).toFixed(1)+' '+Y(series[i]).toFixed(1)+' '; started=true; }
+      return mk('path',Object.assign({d:dstr,fill:'none'},opt));
+    }
+    // area under actual
+    (function(){
+      var dstr='', started=false, lastX=0;
+      for(var i=0;i<TODAY;i++){ dstr+=(started?'L':'M')+X(i).toFixed(1)+' '+Y(actual[i]).toFixed(1)+' '; started=true; lastX=X(i); }
+      dstr+='L'+lastX.toFixed(1)+' '+Y(0)+' L'+X(0).toFixed(1)+' '+Y(0)+' Z';
+      var grad=mk('linearGradient',{id:'ag',x1:0,y1:0,x2:0,y2:1});
+      grad.appendChild(mk('stop',{offset:'0%','stop-color':C.accent,'stop-opacity':.22}));
+      grad.appendChild(mk('stop',{offset:'100%','stop-color':C.accent,'stop-opacity':0}));
+      var defs=mk('defs',{}); defs.appendChild(grad); svg.appendChild(defs);
+      svg.appendChild(mk('path',{d:dstr,fill:'url(#ag)',stroke:'none'}));
+    })();
+    // prior year (dashed)
+    svg.appendChild(path(pr,{stroke:C.prior,'stroke-width':2,'stroke-dasharray':'5 4','stroke-linecap':'round'}));
+    // forecast (dashed accent, lighter)
+    svg.appendChild(path(forecast,{stroke:C.accent,'stroke-width':2,'stroke-dasharray':'2 4','stroke-linecap':'round','opacity':.7}));
+    // actual (solid)
+    svg.appendChild(path(actual,{stroke:C.accent,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'}));
+    // endpoint marker at today
+    svg.appendChild(mk('circle',{cx:X(TODAY-1),cy:Y(actual[TODAY-1]),r:4.5,fill:C.accent,stroke:C.surface,'stroke-width':2}));
+    // "hoje" divider
+    svg.appendChild(mk('line',{x1:X(TODAY-1),y1:PAD.t,x2:X(TODAY-1),y2:PAD.t+ih,stroke:C.muted,'stroke-width':1,'stroke-dasharray':'2 3',opacity:.5}));
+    var hj=mk('text',{x:X(TODAY-1)+4,y:PAD.t+10,fill:C.muted,'font-size':9}); hj.textContent='hoje'; svg.appendChild(hj);
+
+    // hover layer
+    var hover=mk('g',{}); svg.appendChild(hover);
+    var cross=mk('line',{y1:PAD.t,y2:PAD.t+ih,stroke:C.muted,'stroke-width':1,opacity:0}); hover.appendChild(cross);
+    var dotA=mk('circle',{r:4,fill:C.accent,stroke:C.surface,'stroke-width':2,opacity:0}); hover.appendChild(dotA);
+    var dotP=mk('circle',{r:3.5,fill:C.prior,stroke:C.surface,'stroke-width':2,opacity:0}); hover.appendChild(dotP);
+
+    var tt=document.getElementById('tt'), wrap=document.getElementById('chartwrap');
+    var hit=mk('rect',{x:0,y:0,width:VB.w,height:VB.h,fill:'transparent'}); svg.appendChild(hit);
+    function move(ev){
+      var rect=svg.getBoundingClientRect();
+      var px=(ev.clientX-rect.left)/rect.width*VB.w;
+      var i=Math.round((px-PAD.l)/iw*(n-1)); if(i<0)i=0; if(i>n-1)i=n-1;
+      var xv=X(i);
+      cross.setAttribute('x1',xv); cross.setAttribute('x2',xv); cross.setAttribute('opacity','.5');
+      var av = i<TODAY? actual[i] : forecast[i];
+      var isFc = i>=TODAY;
+      dotA.setAttribute('cx',xv); dotA.setAttribute('cy',Y(av)); dotA.setAttribute('opacity','1');
+      dotA.setAttribute('fill', isFc? C.surface : C.accent); dotA.setAttribute('stroke',C.accent);
+      dotP.setAttribute('cx',xv); dotP.setAttribute('cy',Y(pr[i])); dotP.setAttribute('opacity','1');
+      var left=(xv/VB.w)*rect.width;
+      tt.style.left=Math.min(Math.max(left,8), rect.width-160)+'px';
+      tt.style.top=((Y(Math.max(av,pr[i]))/VB.h)*rect.height-10)+'px';
+      tt.style.opacity='1';
+      tt.innerHTML='<div class="d">Dia '+(i+1)+' · '+(isWeekend(i+1)?'fim de semana':'dia útil')+(isFc?' · projeção':'')+'</div>'+
+        '<div class="row"><span><span class="sw" style="background:'+C.accent+'"></span>'+(isFc?'Projeção':'Atual')+'</span><b class="num">'+fmtK(av)+'</b></div>'+
+        '<div class="row"><span><span class="sw" style="background:'+C.prior+'"></span>Ano ant.</span><b class="num">'+fmtK(pr[i])+'</b></div>';
+    }
+    function leave(){ tt.style.opacity='0'; cross.setAttribute('opacity','0'); dotA.setAttribute('opacity','0'); dotP.setAttribute('opacity','0'); }
+    svg.onmousemove=move; svg.onmouseleave=leave;
+  }
+
+  /* ---------- Indicadores table ---------- */
+  var LOJAS=[
+    {n:'Centro', fat:'1,42', margin:'20,1', rup:'6,4', ticket:'61,20', st:'r', civ:'−4,8%', var_:'+1,2%'},
+    {n:'Jardim', fat:'0,98', margin:'22,3', rup:'3,1', ticket:'57,80', st:'g', civ:'−1,1%', var_:'+4,0%'},
+    {n:'Norte',  fat:'0,86', margin:'21,7', rup:'4,2', ticket:'55,10', st:'a', civ:'−2,0%', var_:'+3,3%'},
+    {n:'Vale',   fat:'0,74', margin:'21,0', rup:'4,9', ticket:'58,40', st:'a', civ:'−1,9%', var_:'+3,6%'},
+    {n:'Lago',   fat:'0,82', margin:'22,6', rup:'2,8', ticket:'59,90', st:'g', civ:'+0,4%', var_:'+5,1%'}
+  ];
+  function renderTable(){
+    var b=document.getElementById('tblBody'); b.innerHTML='';
+    document.getElementById('tblBasis').textContent=basis;
+    document.getElementById('tblSub').textContent='Agosto 2026 · 5 lojas · comparação '+basis;
+    LOJAS.forEach(function(l){
+      var d = basis==='civil'? l.civ : l.var_;
+      var neg = d.charAt(0)==='−';
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td>'+l.n+'</td>'+
+        '<td class="num">R$ '+l.fat+' mi</td>'+
+        '<td><span class="delta '+(neg?'n':'p')+'">'+d+'</span></td>'+
+        '<td class="num">'+l.margin+'%</td>'+
+        '<td class="num">'+l.rup+'%</td>'+
+        '<td class="num">R$ '+l.ticket+'</td>'+
+        '<td><span class="pill '+l.st+'"><span class="led" style="background:currentColor"></span>'+
+          (l.st==='g'?'No alvo':l.st==='a'?'Atenção':'Crítico')+'</span></td>';
+      b.appendChild(tr);
+    });
+  }
+
+  /* ---------- toggle + nav wiring ---------- */
+  function setBasis(b){
+    basis=b;
+    document.getElementById('segCivil').classList.toggle('on',b==='civil');
+    document.getElementById('segCivil').setAttribute('aria-pressed',b==='civil');
+    document.getElementById('segVarejo').classList.toggle('on',b==='varejo');
+    document.getElementById('segVarejo').setAttribute('aria-pressed',b==='varejo');
+    document.getElementById('alignNote').textContent = b==='civil'?'(mesma data)':'(semana de varejo alinhada)';
+    document.getElementById('chartHint').innerHTML = b==='civil'
+      ? 'Linha do ano anterior alinhada por <b>data do calendário</b>.'
+      : 'Linha do ano anterior alinhada por <b>semana de varejo</b> — repare como ela desloca para casar os dias da semana.';
+    renderKPIs(); renderNarrative(); renderTable(); draw();
+  }
+  document.getElementById('segCivil').addEventListener('click',function(){setBasis('civil');});
+  document.getElementById('segVarejo').addEventListener('click',function(){setBasis('varejo');});
+
+  var views={inicio:'view-inicio',indicadores:'view-indicadores',soon:'view-soon'};
+  var titles={inicio:'Painel Estratégico',indicadores:'Indicadores',soon:'BoardOS'};
+  document.getElementById('nav').addEventListener('click',function(e){
+    var btn=e.target.closest('button'); if(!btn) return;
+    [].forEach.call(this.querySelectorAll('button'),function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+    var v=btn.getAttribute('data-view');
+    for(var k in views) document.getElementById(views[k]).classList.toggle('hide', views[k]!==views[v]);
+    document.getElementById('viewTitle').textContent=titles[v];
+  });
+
+  /* ---------- init ---------- */
+  renderOKR(); setBasis('civil');
+  window.addEventListener('resize',draw);
+})();
+</script>
