@@ -13,10 +13,33 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from datetime import date  # noqa: E402
+
 from fastapi import FastAPI, Header, HTTPException  # noqa: E402
 from boardos.db import tenant_session  # noqa: E402
+from boardos import comparison  # noqa: E402
 
-app = FastAPI(title="BoardOS API", version="0.0.0-m0")
+app = FastAPI(title="BoardOS API", version="0.1.0-m1")
+
+
+def _gold_mes(cur, ano: int, mes: int):
+    """Total da rede por dia num mês (soma das lojas), a partir do gold."""
+    cur.execute(
+        """
+        SELECT data, sum(faturamento_liq) AS faturamento_liq,
+               sum(cupons) AS cupons, sum(itens) AS itens
+          FROM gold_venda_diaria
+         WHERE categoria_id IS NULL
+           AND date_trunc('month', data) = make_date(%s, %s, 1)
+         GROUP BY data ORDER BY data
+        """,
+        (ano, mes),
+    )
+    return [
+        {"data": r[0], "faturamento_liq": float(r[1]),
+         "cupons": int(r[2]), "itens": int(r[3])}
+        for r in cur.fetchall()
+    ]
 
 
 @app.get("/health")
@@ -54,3 +77,24 @@ def kpi_diario(
     if not rows:
         raise HTTPException(404, "Sem dados no período para este tenant.")
     return {"periodo": [data_de, data_ate], "dias": rows}
+
+
+@app.get("/comparacao/yoy")
+def comparacao_yoy(
+    ano: int,
+    mes: int,
+    x_tenant_id: str = Header(..., alias="X-Tenant-Id"),
+):
+    """Comparação YoY (mês vs. mesmo mês do ano anterior) nas lentes Civil e
+    Varejo, com ajuste de composição de calendário. É o número do Painel
+    Estratégico ("Civil x Varejo"). Ver PLANO.md 3.12 e boardos/comparison.py.
+    """
+    with tenant_session(x_tenant_id) as cur:
+        atual = _gold_mes(cur, ano, mes)
+        base = _gold_mes(cur, ano - 1, mes)
+    if not atual or not base:
+        raise HTTPException(404, "Série insuficiente (falta o mês atual ou o do ano anterior).")
+    res = comparison.compare(atual, base)
+    res["periodo"] = {"tipo": "YoY", "atual": f"{ano}-{mes:02d}", "base": f"{ano-1}-{mes:02d}"}
+    res["advisor"] = comparison.explain(res)
+    return res

@@ -4,9 +4,12 @@ Plataforma SaaS multiempresa de **planejamento estratégico e execução para CE
 de supermercado**. Do plano à execução: lê os dados de venda da rede, compara
 com honestidade (calendário duplo), projeta à frente e explica desvios com IA.
 
-Este repositório está na fase **M0 — Fundação** (multi-tenant + ingestão de
-vendas no grão cupom/item → camada gold + calendário duplo). Ver
-[PLANO-IMPLEMENTACAO.md](PLANO-IMPLEMENTACAO.md).
+Fases entregues:
+- **M0 — Fundação:** multi-tenant + ingestão cupom/item → gold + calendário duplo.
+- **M1 — Motor de comparação:** `boardos/comparison.py` (YoY civil-vs-varejo com
+  ajuste de composição de calendário), testes, e endpoint `GET /comparacao/yoy`.
+
+Ver [PLANO-IMPLEMENTACAO.md](PLANO-IMPLEMENTACAO.md).
 
 ---
 
@@ -15,12 +18,15 @@ vendas no grão cupom/item → camada gold + calendário duplo). Ver
 O motor de **comparação com calendário duplo** roda só com Python stdlib:
 
 ```bash
-python3 scripts/demo_local.py
+make demo        # agosto 2026 vs 2025 (composição real do calendário)
+make demo-comp   # gera ~3 anos de dados e compara YoY no nível gold
+make test        # testes do motor de comparação
 ```
 
-Mostra, com a composição **real** de dias da semana do calendário, a diferença
-entre a lente **Civil** (mês-calendário, dinheiro) e a lente **Varejo**
-(like-for-line por dia da semana, demanda) — o insight central do produto.
+Mostram, com a composição **real** de dias da semana, a diferença entre a lente
+**Civil** (mês-calendário, dinheiro) e a lente **Varejo** (like-for-like por dia
+da semana, demanda) — o insight central do produto. Ex.: *Civil +1,7% / Varejo
++2,6%* porque o mês trocou uma sexta (dia forte) por uma segunda (dia fraco).
 
 ---
 
@@ -38,7 +44,12 @@ make api                      # sobe a API (uvicorn)
 Testar a API (RLS por tenant — use o id impresso pelo seed):
 
 ```bash
+# KPIs diários (gold, com chaves do calendário duplo)
 curl "http://localhost:8000/kpi/diario?data_de=2026-08-01&data_ate=2026-08-31" \
+     -H "X-Tenant-Id: <TENANT_ID>"
+
+# Comparação YoY civil-vs-varejo (o número do Painel Estratégico)
+curl "http://localhost:8000/comparacao/yoy?ano=2026&mes=8" \
      -H "X-Tenant-Id: <TENANT_ID>"
 ```
 
@@ -52,10 +63,11 @@ chave natural.
 ```
 db/migrations/     schema Postgres: platform, tenant, calendário duplo, fato
                    item de venda, gold rollups, RLS por tenant
-boardos/           núcleo Python: calendar_gen, mapping, ingestion, db (RLS)
-api/               FastAPI mínima com contexto de tenant
-scripts/           migrate, seed, demo_local (roda sem banco)
-data/              CSV de exemplo (grão cupom/item) + mapa de colunas
+boardos/           núcleo Python: calendar_gen, mapping, ingestion, db (RLS),
+                   comparison (motor de comparação com ajuste de calendário)
+api/               FastAPI: KPIs diários + comparação YoY, com contexto de tenant
+scripts/           migrate, seed, gen_dataset, demos e testes (rodam sem banco)
+data/              CSV item de exemplo + mapa de colunas + série gold gerada
 ```
 
 ### Decisões de fundação já implementadas
@@ -64,6 +76,8 @@ data/              CSV de exemplo (grão cupom/item) + mapa de colunas
 - **Camada gold** recomputada incrementalmente por (loja, dia).
 - **Calendário duplo** (civil + varejo/ISO week) com ajuste de composição.
 - **Medidor de uso** para billing (conta itens distintos, não linhas).
+- **Motor de comparação** (M1): YoY civil-vs-varejo com ajuste de composição de
+  calendário, com testes e endpoint na API.
 
 ---
 
