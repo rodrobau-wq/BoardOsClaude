@@ -24,6 +24,9 @@ except ImportError:
 from boardos import crm  # noqa: E402
 from boardos.calendar_gen import upsert_into  # noqa: E402
 from boardos.db import tenant_session  # noqa: E402
+from boardos.auth import hash_password  # noqa: E402
+
+SENHA_DEMO = "demo1234"
 
 # OKRs demo (varejo). (titulo, periodo) -> lista de KRs (titulo, unidade, meta, atual, base, direcao)
 OKRS_DEMO = [
@@ -60,9 +63,9 @@ DE, ATE = date(2024, 1, 1), date(2026, 12, 31)
 
 # perfil por empresa: lojas, escala e crescimento acumulado por ano
 PERFIS = {
-    "EMP-1001": {"lojas": ["C01", "C02"], "escala": 1.0, "cresc": {2024: 0, 2025: .030, 2026: .055}},
-    "EMP-1002": {"lojas": ["L1"],         "escala": 2.6, "cresc": {2024: 0, 2025: .040, 2026: .070}},
-    "EMP-1003": {"lojas": ["H1"],         "escala": 4.1, "cresc": {2024: 0, 2025: .015, 2026: .025}},
+    "EMP-1001": {"lojas": ["C01", "C02"], "escala": 1.0, "cresc": {2024: 0, 2025: .030, 2026: .055}, "email": "ceo@aurora.demo"},
+    "EMP-1002": {"lojas": ["L1"],         "escala": 2.6, "cresc": {2024: 0, 2025: .040, 2026: .070}, "email": "ceo@belavista.demo"},
+    "EMP-1003": {"lojas": ["H1"],         "escala": 4.1, "cresc": {2024: 0, 2025: .015, 2026: .025}, "email": "ceo@maxpreco.demo"},
 }
 BASE_DOW = {1: 150, 2: 148, 3: 150, 4: 156, 5: 190, 6: 236, 7: 210}  # R$ mil
 
@@ -88,14 +91,12 @@ def gen_vendas(perfil, salt):
 
 
 def main():
-    # 0) limpeza (DEMO): remove tenants fora da lista atual do CRM (dupes/órfãos).
-    #    Converge para exatamente as empresas do CRM. Só para a fase demo.
-    alvo = [crm.slugify(ext) for ext in PERFIS]
-    with psycopg.connect(ADMIN_DSN, autocommit=True) as conn:
-        n = conn.execute("DELETE FROM platform.tenant WHERE slug <> ALL(%s)", (alvo,)).rowcount
-    print(f"limpeza: {n} tenant(s) fora da lista do CRM removido(s)")
+    # Seed demo só roda quando SEED_DEMO está setado (production-safe).
+    if not os.environ.get("SEED_DEMO"):
+        print("SEED_DEMO não setado — pulando seed de demonstração.")
+        return
 
-    # 1) empresas -> tenants
+    # 1) empresas -> tenants (upsert idempotente por slug estável; NÃO apaga nada)
     idmap = crm.onboard_empresas_csv(os.path.join(ROOT, "data", "crm_empresas_exemplo.csv"), ADMIN_DSN)
     print("empresas -> tenants:", idmap)
 
@@ -113,7 +114,27 @@ def main():
         res = crm.import_vendas_diarias_rows(tid, gen_vendas(perfil, salt * 97))
         seed_okrs(tid)
         print(f"  {ext} ({tid}): {res['linhas']} linhas de gold + OKRs demo")
-    print("\nOK — abra o painel e escolha a empresa no seletor.")
+
+    # 4) usuários de login (senha com hash) — um CEO por empresa
+    with psycopg.connect(ADMIN_DSN, autocommit=True) as conn:
+        for ext, perfil in PERFIS.items():
+            tid = idmap.get(ext)
+            if not tid:
+                continue
+            conn.execute(
+                """
+                INSERT INTO platform.usuario_login (email, senha_hash, nome, tenant_id, papel)
+                VALUES (%s,%s,%s,%s,'estrategico')
+                ON CONFLICT (email) DO UPDATE SET
+                  senha_hash=EXCLUDED.senha_hash, tenant_id=EXCLUDED.tenant_id,
+                  nome=EXCLUDED.nome, papel=EXCLUDED.papel
+                """,
+                (perfil["email"], hash_password(SENHA_DEMO), "CEO", tid),
+            )
+
+    print("\nOK — logins demo (senha: %s):" % SENHA_DEMO)
+    for ext, perfil in PERFIS.items():
+        print("   %-22s %s" % (perfil["email"], ext))
 
 
 if __name__ == "__main__":

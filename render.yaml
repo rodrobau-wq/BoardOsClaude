@@ -34,6 +34,10 @@ services:
           property: connectionString
       - key: PYTHON_VERSION
         value: "3.11.9"
+      - key: BOARDOS_SECRET       # assina os tokens JWT; gerado e guardado pelo Render
+        generateValue: true
+      - key: SEED_DEMO            # 1 = popula dados/logins demo no boot. Remover em produção real.
+        value: "1"
 
   # Painel visual (static site, free) — consome a API acima.
   - type: web

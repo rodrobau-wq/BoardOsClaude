@@ -84,6 +84,16 @@
   .bar>span{display:block;height:100%}
   .pg{color:var(--good)}.pa{color:var(--warn)}.pr{color:var(--crit)}
   .bg{background:var(--good)}.ba{background:var(--warn)}.br{background:var(--crit)}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn.ghost:hover{background:var(--surface-2);color:var(--ink)}
+  .login-card{max-width:360px;margin:8vh auto 0;background:var(--surface);border:1px solid var(--border);
+    border-radius:16px;box-shadow:var(--shadow);padding:26px;display:flex;flex-direction:column;gap:12px}
+  .login-card h2{margin:0 0 4px;font-size:19px}
+  .login-card .lead{color:var(--muted);font-size:13px;margin-top:-6px}
+  .login-card input{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);
+    border-radius:9px;padding:11px 12px;font:14px var(--font)}
+  .login-card .btn{padding:11px;text-align:center;font-size:14px}
+  .login-card .err{color:var(--crit);font-size:12.5px;min-height:16px}
   .msg{padding:16px;border-radius:12px;font-size:13.5px}
   .msg.err{background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit)}
   .msg.info{background:var(--accent-soft);color:var(--accent-strong)}
@@ -93,17 +103,27 @@
 <body>
 <header class="top">
   <div class="logo">B</div>
-  <div><b>BoardOS</b><small>Painel Estratégico · dado ao vivo</small></div>
-  <div class="cfg">
-    <select id="tenant"><option value="">— carregando empresas… —</option></select>
+  <div><b>BoardOS</b><small id="tenantNome">Painel Estratégico</small></div>
+  <div class="cfg hide" id="cfg">
     <input id="ano" class="mini num" value="2026">
     <input id="mes" class="mini num" value="8">
     <button class="btn" id="load">Carregar</button>
+    <button class="btn ghost" id="logout">Sair</button>
   </div>
 </header>
 
 <div class="wrap">
-  <div id="status" class="msg info">Escolha a <b>empresa</b> no seletor acima e clique <b>Carregar</b>.</div>
+  <div id="login" class="login-card">
+    <h2>Entrar</h2>
+    <div class="lead">Painel Estratégico BoardOS</div>
+    <input id="email" type="email" placeholder="e-mail" autocomplete="username">
+    <input id="senha" type="password" placeholder="senha" autocomplete="current-password">
+    <button class="btn" id="entrar">Entrar</button>
+    <div class="err" id="loginErr"></div>
+    <div class="hint">Demo: <b>ceo@aurora.demo</b> · ceo@belavista.demo · ceo@maxpreco.demo — senha <b>demo1234</b></div>
+  </div>
+
+  <div id="status" class="msg info hide">Clique <b>Carregar</b>.</div>
 
   <div id="content" class="hide">
     <!-- hero civil vs varejo -->
@@ -169,20 +189,21 @@ var API = location.hostname === "localhost" || location.protocol === "file:"
   : (window.BOARDOS_API || "https://boardos-api.onrender.com");
 var lens = "civil";
 var last = null;
+var TOKEN = localStorage.getItem("boardos_token") || null;
 
+function setToken(t){ TOKEN=t; if(t) localStorage.setItem("boardos_token",t); else localStorage.removeItem("boardos_token"); }
 function pct(v){return (v>=0?"+":"−")+Math.abs(v*100).toFixed(1)+"%";}
 function brl(v){return "R$ "+(v/1000).toLocaleString("pt-BR",{maximumFractionDigits:0})+" mil";}
 function el(id){return document.getElementById(id);}
 
 async function jget(path){
-  var r = await fetch(API+path, {headers:{"X-Tenant-Id": el("tenant").value.trim()}});
+  var r = await fetch(API+path, {headers:{"Authorization":"Bearer "+TOKEN}});
+  if(r.status===401){ logout("Sessão expirada. Entre novamente."); throw new Error("401"); }
   if(!r.ok){var t=await r.text(); throw new Error("HTTP "+r.status+" — "+t);}
   return r.json();
 }
 
 async function load(){
-  var tid = el("tenant").value.trim();
-  if(!tid){ setStatus("Informe o Tenant ID primeiro.", "err"); return; }
   var ano = +el("ano").value, mes = +el("mes").value;
   setStatus("Carregando…", "info");
   try{
@@ -310,23 +331,47 @@ function drawChart(){
   svg.appendChild(line(A,{stroke:Cac,"stroke-width":3,"stroke-linecap":"round","stroke-linejoin":"round"}));
 }
 
-async function loadTenants(){
-  var sel = el("tenant");
+function showLogin(msg){
+  el("login").classList.remove("hide");
+  el("cfg").classList.add("hide");
+  el("content").classList.add("hide");
+  el("status").classList.add("hide");
+  el("tenantNome").textContent = "Painel Estratégico";
+  el("loginErr").textContent = msg || "";
+}
+function showApp(tenantNome){
+  el("login").classList.add("hide");
+  el("cfg").classList.remove("hide");
+  el("tenantNome").textContent = tenantNome;
+}
+function logout(msg){ setToken(null); showLogin(msg); }
+
+async function entrar(){
+  var email = el("email").value.trim(), senha = el("senha").value;
+  if(!email || !senha){ el("loginErr").textContent = "Informe e-mail e senha."; return; }
+  el("loginErr").textContent = "Entrando…";
   try{
-    var r = await fetch(API+"/tenants");
-    if(!r.ok) throw new Error("HTTP "+r.status);
+    var r = await fetch(API+"/auth/login", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({email:email, senha:senha})});
+    if(!r.ok){ var t = await r.json().catch(function(){return {};});
+      el("loginErr").textContent = (t.detail || "Falha no login") + "."; return; }
     var j = await r.json();
-    if(!j.tenants.length){ sel.innerHTML='<option value="">(nenhuma empresa — rode o onboarding)</option>'; return; }
-    sel.innerHTML = '<option value="">— escolha a empresa —</option>' +
-      j.tenants.map(function(t){return '<option value="'+t.id+'">'+t.nome+'</option>';}).join("");
-  }catch(e){
-    sel.innerHTML='<option value="">(API acordando… clique Carregar de novo)</option>';
-    setStatus("Não consegui listar as empresas ("+e.message+"). O serviço grátis pode estar acordando — aguarde uns segundos e recarregue.", "info");
-  }
+    setToken(j.token);
+    showApp(j.tenant.nome);
+    load();
+  }catch(e){ el("loginErr").textContent = "Erro de conexão (o serviço pode estar acordando). Tente de novo."; }
 }
 
+async function boot(){
+  if(!TOKEN){ showLogin(); return; }
+  try{ var me = await jget("/me"); showApp(me.tenant.nome); load(); }
+  catch(e){ /* jget trata 401 → volta ao login */ }
+}
+
+el("entrar").addEventListener("click", entrar);
+el("senha").addEventListener("keydown", function(e){ if(e.key==="Enter") entrar(); });
+el("logout").addEventListener("click", function(){ logout(); });
 el("load").addEventListener("click", load);
-el("tenant").addEventListener("change", function(){ if(el("tenant").value) load(); });
 Array.prototype.forEach.call(document.querySelectorAll("#seg button"), function(b){
   b.addEventListener("click", function(){ lens=b.getAttribute("data-l");
     Array.prototype.forEach.call(document.querySelectorAll("#seg button"),function(x){x.classList.toggle("on",x===b);});
@@ -334,7 +379,7 @@ Array.prototype.forEach.call(document.querySelectorAll("#seg button"), function(
   });
 });
 
-loadTenants();
+boot();
 </script>
 </body>
 </html>
