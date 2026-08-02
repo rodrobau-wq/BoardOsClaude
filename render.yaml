@@ -1,0 +1,33 @@
+# Render Blueprint — sobe Postgres (com PostGIS) + a API do BoardOS.
+# No Render:  New → Blueprint → conectar o repo BoardOsClaude → Apply.
+# Docs: https://render.com/docs/blueprint-spec
+
+databases:
+  - name: boardos-db
+    databaseName: boardos
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: boardos-api
+    runtime: python
+    plan: free
+    branch: main
+    healthCheckPath: /health
+    buildCommand: pip install -r requirements.txt
+    # migrate.py é idempotente (registra migrações aplicadas) → seguro a cada deploy.
+    startCommand: python scripts/migrate.py && uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      # A app conecta no banco gerenciado. FORCE ROW LEVEL SECURITY garante que,
+      # mesmo conectando como owner, o isolamento por tenant continua valendo.
+      - key: BOARDOS_ADMIN_DSN
+        fromDatabase:
+          name: boardos-db
+          property: connectionString
+      - key: BOARDOS_DSN
+        fromDatabase:
+          name: boardos-db
+          property: connectionString
+      - key: PYTHON_VERSION
+        value: "3.11.9"
