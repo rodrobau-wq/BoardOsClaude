@@ -167,7 +167,7 @@ def okrs(tid: str = Depends(tenant_of)):
         objs = [{"id": str(r[0]), "titulo": r[1], "periodo": r[2],
                  "nivel": r[3], "owner": r[4], "krs": []} for r in cur.fetchall()]
         by_id = {o["id"]: o for o in objs}
-        cur.execute("SELECT objetivo_id, titulo, unidade, meta, atual, base, direcao, fonte "
+        cur.execute("SELECT objetivo_id, titulo, unidade, meta, atual, base, direcao, fonte, id "
                     "FROM okr_kr ORDER BY ordem")
         for r in cur.fetchall():
             oid = str(r[0])
@@ -178,11 +178,118 @@ def okrs(tid: str = Depends(tenant_of)):
             if auto is not None:
                 atual = auto
             prog, farol = _kr_progresso(r[3], atual, r[5], r[6])
-            by_id[oid]["krs"].append({"titulo": r[1], "unidade": r[2],
+            by_id[oid]["krs"].append({"id": str(r[8]), "titulo": r[1], "unidade": r[2],
                                       "meta": float(r[3]), "atual": atual,
+                                      "base": float(r[5]) if r[5] is not None else None,
+                                      "direcao": r[6], "fonte": r[7],
                                       "progresso": prog, "farol": farol,
                                       "auto": auto is not None})
     return {"objetivos": objs}
+
+
+# ------------------------------------------------------ OKRs: edição (CRUD)
+class ObjetivoIn(BaseModel):
+    titulo: str
+    periodo: Optional[str] = None
+    nivel: str = "corporativo"
+    owner: Optional[str] = None
+
+
+class KrIn(BaseModel):
+    titulo: str
+    unidade: Optional[str] = None
+    meta: float
+    atual: float = 0
+    base: Optional[float] = None
+    direcao: str = "up"
+    fonte: Optional[str] = None
+
+
+def _can_edit(user: dict) -> None:
+    if user.get("papel") not in ("super_admin", "admin_tenant", "estrategico"):
+        raise HTTPException(403, "Seu papel não permite editar metas.")
+
+
+@app.post("/okrs/objetivo")
+def criar_objetivo(body: ObjetivoIn, user: dict = Depends(current),
+                   tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "INSERT INTO okr_objetivo (tenant_id, titulo, periodo, nivel, owner, ordem) "
+            "SELECT %s,%s,%s,%s,%s, COALESCE(max(ordem)+1,0) FROM okr_objetivo "
+            "RETURNING id",
+            (tid, body.titulo, body.periodo, body.nivel, body.owner))
+        oid = cur.fetchone()[0]
+    return {"id": str(oid)}
+
+
+@app.put("/okrs/objetivo/{oid}")
+def editar_objetivo(oid: str, body: ObjetivoIn, user: dict = Depends(current),
+                    tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "UPDATE okr_objetivo SET titulo=%s, periodo=%s, nivel=%s, owner=%s WHERE id=%s",
+            (body.titulo, body.periodo, body.nivel, body.owner, oid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Objetivo não encontrado.")
+    return {"ok": True}
+
+
+@app.delete("/okrs/objetivo/{oid}")
+def excluir_objetivo(oid: str, user: dict = Depends(current),
+                     tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM okr_objetivo WHERE id=%s", (oid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Objetivo não encontrado.")
+    return {"ok": True}
+
+
+@app.post("/okrs/objetivo/{oid}/kr")
+def criar_kr(oid: str, body: KrIn, user: dict = Depends(current),
+             tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT 1 FROM okr_objetivo WHERE id=%s", (oid,))
+        if not cur.fetchone():
+            raise HTTPException(404, "Objetivo não encontrado.")
+        cur.execute(
+            "INSERT INTO okr_kr (tenant_id, objetivo_id, titulo, unidade, meta, atual, base, direcao, fonte, ordem) "
+            "SELECT %s,%s,%s,%s,%s,%s,%s,%s,%s, COALESCE(max(ordem)+1,0) FROM okr_kr WHERE objetivo_id=%s "
+            "RETURNING id",
+            (tid, oid, body.titulo, body.unidade, body.meta, body.atual,
+             body.base, body.direcao, body.fonte, oid))
+        kid = cur.fetchone()[0]
+    return {"id": str(kid)}
+
+
+@app.put("/okrs/kr/{kid}")
+def editar_kr(kid: str, body: KrIn, user: dict = Depends(current),
+              tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "UPDATE okr_kr SET titulo=%s, unidade=%s, meta=%s, atual=%s, base=%s, "
+            "direcao=%s, fonte=%s WHERE id=%s",
+            (body.titulo, body.unidade, body.meta, body.atual, body.base,
+             body.direcao, body.fonte, kid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "KR não encontrado.")
+    return {"ok": True}
+
+
+@app.delete("/okrs/kr/{kid}")
+def excluir_kr(kid: str, user: dict = Depends(current),
+               tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM okr_kr WHERE id=%s", (kid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "KR não encontrado.")
+    return {"ok": True}
 
 
 # ------------------------------------------------------------- KPI diário
