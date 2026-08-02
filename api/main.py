@@ -57,18 +57,6 @@ def health():
     return {"ok": True, "service": "boardos", "stage": "M0"}
 
 
-@app.get("/admin/onboard-demo")
-def admin_onboard_demo():
-    """TEMPORÁRIO (debug): roda o onboarding demo e devolve a saída/erro.
-    Remover depois. Sem auth — só para destravar o seed multiempresa."""
-    import subprocess
-    import sys
-    r = subprocess.run([sys.executable, "scripts/onboard_crm_demo.py"],
-                       capture_output=True, text=True, timeout=180)
-    return {"returncode": r.returncode,
-            "stdout": r.stdout[-3000:], "stderr": r.stderr[-3000:]}
-
-
 @app.get("/tenants")
 def tenants():
     """Lista as empresas (tenants) para o seletor do painel.
