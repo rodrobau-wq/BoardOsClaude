@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from boardos import comparison  # noqa: E402
+from boardos import advisor, comparison  # noqa: E402
 from boardos.auth import decode_token, make_token, verify_password  # noqa: E402
 from boardos.db import platform_session, tenant_session  # noqa: E402
 
@@ -387,6 +387,59 @@ def lojas_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
     with tenant_session(tid) as cur:
         lojas = _lojas_mes(cur, ano, mes)
     return {"periodo": f"{ano}-{mes:02d}", "lojas": lojas}
+
+
+# ---------------------------------------------------- Advisor com IA
+@app.get("/advisor/insight")
+def advisor_insight(tid: str = Depends(tenant_of)):
+    """Leitura executiva do último mês gerada por IA (Claude), com fallback.
+
+    fonte="ia": texto narrativo gerado sobre os números reais do tenant.
+    fonte="motor": sem chave/erro — o painel usa o Fato/Causa/Ação estatístico.
+    """
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT max(data) FROM gold_venda_diaria")
+        row = cur.fetchone()
+        ult = row[0] if row else None
+        if not ult:
+            return {"fonte": "motor"}
+        yoy = _yoy_do_ultimo_mes(cur)
+        lojas = _lojas_mes(cur, ult.year, ult.month)
+        cur.execute(
+            "SELECT k.titulo, k.meta, k.atual, k.base, k.direcao, k.fonte, o.titulo "
+            "FROM okr_kr k JOIN okr_objetivo o ON o.id=k.objetivo_id ORDER BY k.ordem")
+        metas = []
+        for kt, meta, atual, base, direcao, fonte, ot in cur.fetchall():
+            a = float(atual)
+            auto = _kr_auto(fonte, yoy) if fonte else None
+            if auto is not None:
+                a = auto
+            prog, farol = _kr_progresso(meta, a, base, direcao)
+            metas.append({"objetivo": ot, "kr": kt, "meta": float(meta),
+                          "atual": a, "progresso": prog, "farol": farol})
+
+    if not yoy:
+        return {"fonte": "motor"}
+    contexto = {
+        "mes_referencia": f"{ult.year}-{ult.month:02d}",
+        "comparacao_yoy": {
+            "faturamento_total": yoy["total_atual"],
+            "var_civil_pct": round(yoy["var_civil"] * 100, 1),
+            "var_varejo_ajustada_pct": round(yoy["var_ajustada"] * 100, 1),
+            "efeito_calendario_pp": round(yoy["efeito_calendario"] * 100, 1),
+            "dias_ganhos": yoy["dias_ganhos"], "dias_perdidos": yoy["dias_perdidos"],
+            "ticket_atual": yoy.get("ticket_atual"), "ticket_ano_anterior": yoy.get("ticket_base"),
+        },
+        "lojas": [{"nome": l["nome"], "faturamento": l["faturamento"],
+                   "var_civil_pct": round(l["var_civil"] * 100, 1) if l["var_civil"] is not None else None,
+                   "var_varejo_pct": round(l["var_ajustada"] * 100, 1) if l["var_ajustada"] is not None else None}
+                  for l in lojas],
+        "metas": metas,
+    }
+    texto = advisor.gerar_insight(contexto, cache_key=f"{tid}:{ult.isoformat()}")
+    if texto:
+        return {"fonte": "ia", "texto": texto}
+    return {"fonte": "motor"}
 
 
 # ------------------------------------------------- alertas + Ciclo FCA

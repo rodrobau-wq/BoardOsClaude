@@ -235,10 +235,13 @@
     </section>
 
     <section class="card">
-      <header><h2>Resumo do Advisor</h2><span class="sub">✦ IA</span></header>
+      <header><h2>Resumo do Advisor</h2><span class="sub" id="aiFonte">✦ IA</span></header>
       <div class="body" style="display:flex;gap:12px">
         <div class="ai">✦</div>
-        <div class="fca" id="fca"></div>
+        <div style="flex:1;min-width:0">
+          <div id="aiTexto" class="hide" style="font-size:13.5px;white-space:pre-wrap;line-height:1.55"></div>
+          <div class="fca" id="advisorFca"></div>
+        </div>
       </div>
     </section>
 
@@ -297,6 +300,18 @@ async function load(){
     try{ var al = await jget("/alertas"); renderAlertas(al.alertas); }
     catch(_){ renderAlertas([]); }
     refreshFca();
+    // IA em segundo plano: se disponível, substitui o resumo estatístico
+    el("aiTexto").classList.add("hide");
+    el("advisorFca").classList.remove("hide");
+    el("aiFonte").textContent = "✦ IA";
+    jget("/advisor/insight").then(function(r){
+      if(r.fonte === "ia" && r.texto){
+        el("aiTexto").textContent = r.texto;
+        el("aiTexto").classList.remove("hide");
+        el("advisorFca").classList.add("hide");
+        el("aiFonte").textContent = "✦ gerado por IA";
+      }
+    }).catch(function(){});
     el("content").classList.remove("hide");
     setStatus("", "hide");
   }catch(e){
@@ -335,8 +350,8 @@ function render(){
     k.appendChild(d);
   });
 
-  // Advisor
-  el("fca").innerHTML = ["fato","causa","acao"].map(function(kk){
+  // Advisor (fallback estatístico; a IA substitui via /advisor/insight)
+  el("advisorFca").innerHTML = ["fato","causa","acao"].map(function(kk){
     return '<div class="t"><span class="kk">'+kk+'</span><span>'+(c.advisor[kk]||"")+'</span></div>';
   }).join("");
 
