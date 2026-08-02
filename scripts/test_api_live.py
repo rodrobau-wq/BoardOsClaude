@@ -109,6 +109,35 @@ def main():
     st, u = req("GET", "/usuarios", token=tok)
     check("CEO em /usuarios => 403 (não é admin)", st == 403)
 
+    # módulo de Plano (1.2–1.5)
+    st, dsc = req("GET", "/descoberta", token=tok)
+    check("descoberta GET (roteiro)", st == 200 and len(dsc.get("perguntas", [])) == 17)
+    st, _ = req("PUT", "/descoberta", token=tok,
+                body={"respostas": {"A1": "Rede Teste, 12 anos"}})
+    check("descoberta PUT", st == 200)
+    st, _ = req("POST", "/descoberta/resumo", token=tok)
+    check("resumo sem obrigatórias => 400", st == 400)
+
+    st, _ = req("PUT", "/direcao", token=tok,
+                body={"proposito": "Alimentar bem o bairro", "visao": "Referência regional"})
+    check("direcao PUT", st == 200)
+    st, d = req("GET", "/direcao", token=tok)
+    check("direcao GET persistiu", st == 200 and d.get("proposito") == "Alimentar bem o bairro")
+
+    st, s = req("POST", "/swot", token=tok, body={"quadrante": "forca", "texto": "Hortifrúti forte"})
+    check("swot POST", st == 200 and s.get("id"))
+    st, _ = req("DELETE", "/swot/" + s.get("id", "x"), token=tok)
+    check("swot DELETE", st == 200)
+
+    st, _ = req("PUT", "/radar", token=tok, body={"notas": {"Financeiro": 7}})
+    check("radar PUT", st == 200)
+
+    st, a = req("POST", "/acoes", token=tok,
+                body={"oque": "TESTE smoke — remover", "quem": "QA", "status": "planejada"})
+    check("acoes POST", st == 200 and a.get("id"))
+    st, _ = req("DELETE", "/acoes/" + a.get("id", "x"), token=tok)
+    check("acoes DELETE", st == 200)
+
     print(f"\n{_ok} ok, {_fail} falha(s).")
     sys.exit(1 if _fail else 0)
 

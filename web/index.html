@@ -138,6 +138,34 @@
   .msg{padding:16px;border-radius:12px;font-size:13.5px}
   .msg.err{background:var(--crit-soft);color:var(--crit);border:1px solid var(--crit)}
   .msg.info{background:var(--accent-soft);color:var(--accent-strong)}
+  .tabs{display:inline-flex;gap:2px;background:var(--surface-2);border:1px solid var(--border);
+    border-radius:9px;padding:3px;margin-left:14px}
+  .tabs .tab{all:unset;cursor:pointer;padding:6px 14px;border-radius:7px;font-size:12.5px;
+    font-weight:600;color:var(--muted)}
+  .tabs .tab.on{background:var(--surface);color:var(--accent-strong);box-shadow:var(--shadow)}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:800px){.form-grid{grid-template-columns:1fr}}
+  .form-grid label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .form-grid textarea{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);
+    border-radius:9px;padding:10px 12px;font:13.5px var(--font);min-height:74px;resize:vertical}
+  .swot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:800px){.swot-grid{grid-template-columns:1fr}}
+  .swot-q{border:1px solid var(--border);border-radius:11px;padding:12px}
+  .swot-q h4{margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  .swot-q ul{list-style:none;margin:0 0 8px;padding:0;display:flex;flex-direction:column;gap:5px}
+  .swot-q li{display:flex;justify-content:space-between;gap:8px;font-size:13px;
+    background:var(--surface-2);border-radius:7px;padding:6px 9px}
+  .swot-q input{border:1px solid var(--border);background:var(--surface);color:var(--ink);
+    border-radius:7px;padding:7px 9px;font:12.5px var(--font);width:100%}
+  .radar-row{display:grid;grid-template-columns:180px 1fr 34px;gap:12px;align-items:center;margin:9px 0;font-size:13px}
+  .radar-row input[type=range]{width:100%;accent-color:var(--accent)}
+  .desc-q{font-size:15px;font-weight:600;margin:6px 0 10px}
+  .desc-meta{color:var(--muted);font-size:12px}
+  .desc-nav{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  #descInput{width:100%;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);
+    border-radius:9px;padding:11px 12px;font:14px var(--font);min-height:64px;resize:vertical}
+  #descResumo{white-space:pre-wrap;font-size:13px;line-height:1.6;background:var(--surface-2);
+    border:1px solid var(--border);border-radius:11px;padding:14px;margin-top:12px}
   .hide{display:none!important}
 </style>
 </head>
@@ -145,6 +173,10 @@
 <header class="top">
   <div class="logo">B</div>
   <div><b>BoardOS</b><small id="tenantNome">Painel Estratégico</small></div>
+  <div class="tabs hide" id="tabs">
+    <button class="tab on" data-tab="painel">Painel</button>
+    <button class="tab" data-tab="plano">Plano</button>
+  </div>
   <div class="cfg hide" id="cfg">
     <select id="empresa" class="hide"></select>
     <input id="ano" class="mini num" value="2026">
@@ -167,6 +199,64 @@
   </div>
 
   <div id="status" class="msg info hide">Clique <b>Carregar</b>.</div>
+
+  <div id="plano" class="hide">
+    <section class="card" style="margin-bottom:16px">
+      <header><h2>Entrevista de Descoberta</h2><span class="sub" id="descProg"></span></header>
+      <div class="body">
+        <div id="descWizard">
+          <div class="desc-meta" id="descBloco"></div>
+          <div class="desc-q" id="descPergunta">Carregando…</div>
+          <textarea id="descInput" placeholder="Responda com números e exemplos concretos…"></textarea>
+          <div class="desc-nav">
+            <button class="btn ghost" id="descAnt">‹ Anterior</button>
+            <button class="btn" id="descSalvar">Salvar e avançar</button>
+            <button class="btn ghost" id="descProx">Próxima ›</button>
+            <span style="flex:1"></span>
+            <button class="btn ghost" id="descGerar">Gerar resumo executivo</button>
+          </div>
+          <div class="hint" id="descHint" style="margin-top:8px"></div>
+        </div>
+        <div id="descResumo" class="hide"></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-bottom:16px">
+      <header><h2>Direção Estratégica</h2>
+        <button class="btn" id="dirSalvar" style="padding:6px 14px;font-size:12.5px">Salvar</button>
+      </header>
+      <div class="body form-grid">
+        <label>Propósito<textarea id="dirProposito" placeholder="Por que a rede existe?"></textarea></label>
+        <label>Visão<textarea id="dirVisao" placeholder="Onde queremos chegar em 3–5 anos?"></textarea></label>
+        <label>Valores<textarea id="dirValores" placeholder="O que não abrimos mão?"></textarea></label>
+        <label>Objetivo de longo prazo<textarea id="dirObjetivo" placeholder="O sonho grande, em uma frase"></textarea></label>
+      </div>
+    </section>
+
+    <section class="card" style="margin-bottom:16px">
+      <header><h2>Diagnóstico — SWOT</h2><span class="sub">5–10 itens por quadrante</span></header>
+      <div class="body swot-grid" id="swotGrid"></div>
+    </section>
+
+    <section class="card" style="margin-bottom:16px">
+      <header><h2>Radar de Maturidade</h2>
+        <button class="btn" id="radarSalvar" style="padding:6px 14px;font-size:12.5px">Salvar notas</button>
+      </header>
+      <div class="body" id="radarBody"></div>
+    </section>
+
+    <section class="card">
+      <header><h2>Plano de Ação — 5W2H</h2>
+        <button class="btn ghost" id="acaoAdd" style="padding:6px 12px;font-size:12.5px">＋ Ação</button>
+      </header>
+      <div class="body" style="overflow-x:auto">
+        <table class="tbl" id="acoesTbl">
+          <thead><tr><th>O quê</th><th>Quem</th><th>Quando</th><th>Custo</th><th>Meta ligada</th><th>Status</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
 
   <div id="content" class="hide">
     <!-- hero civil vs varejo -->
@@ -291,6 +381,8 @@ async function jget(path){
 }
 
 async function load(){
+  planoCarregado = false;                 // troca de empresa/período: Plano recarrega
+  if(TAB === "plano") loadPlano();
   var emp = el("empresa");
   if(!emp.classList.contains("hide") && !emp.value){
     setStatus("Escolha a <b>empresa</b> no seletor para carregar os dados.", "info"); return;
@@ -476,6 +568,138 @@ async function excluir(tipo, id){
   if(!window.confirm("Excluir "+tipo+"? Essa ação não tem desfazer.")) return;
   try{ await jsend("DELETE", tipo==="meta"?"/okrs/objetivo/"+id:"/okrs/kr/"+id); refreshOkrs(); }
   catch(e){ window.alert("Não foi possível excluir: "+e.message); }
+}
+
+/* ===================== aba Plano (1.2–1.5) ===================== */
+var TAB = "painel", planoCarregado = false;
+function showTab(t){
+  TAB = t;
+  Array.prototype.forEach.call(document.querySelectorAll("#tabs .tab"), function(b){
+    b.classList.toggle("on", b.getAttribute("data-tab") === t);
+  });
+  el("plano").classList.toggle("hide", t !== "plano");
+  if(t === "painel"){ if(last) el("content").classList.remove("hide"); }
+  else { el("content").classList.add("hide"); if(!planoCarregado) loadPlano(); }
+}
+
+var descQ = [], descR = {}, descObrig = [], descIdx = 0;
+async function loadPlano(){
+  planoCarregado = true;
+  try{
+    var d = await jget("/descoberta");
+    descQ = d.perguntas || []; descR = d.respostas || {}; descObrig = d.obrigatorias || [];
+    descIdx = firstUnanswered();
+    renderDesc();
+    if(d.resumo){ el("descResumo").textContent = d.resumo; el("descResumo").classList.remove("hide"); }
+    else el("descResumo").classList.add("hide");
+  }catch(_){}
+  try{
+    var dir = await jget("/direcao");
+    el("dirProposito").value = dir.proposito || "";
+    el("dirVisao").value = dir.visao || "";
+    el("dirValores").value = dir.valores || "";
+    el("dirObjetivo").value = dir.objetivo_lp || "";
+  }catch(_){}
+  refreshSwot(); refreshRadar(); refreshAcoes();
+}
+function firstUnanswered(){
+  for(var i=0;i<descQ.length;i++){ if(!(descR[descQ[i].k]||"").trim()) return i; }
+  return 0;
+}
+function renderDesc(){
+  if(!descQ.length) return;
+  if(descIdx < 0) descIdx = 0;
+  if(descIdx >= descQ.length) descIdx = descQ.length - 1;
+  var p = descQ[descIdx];
+  var resp = descQ.filter(function(q){ return (descR[q.k]||"").trim(); }).length;
+  el("descProg").textContent = resp + " de " + descQ.length + " respondidas";
+  el("descBloco").textContent = (p.bloco==="A" ? "Bloco A · o negócio" : "Bloco B · expectativas do plano")
+    + " — " + p.k + (descObrig.indexOf(p.k)>=0 ? " · obrigatória" : "");
+  el("descPergunta").textContent = p.q;
+  el("descInput").value = descR[p.k] || "";
+  el("descHint").textContent = "";
+}
+async function descSave(avanca){
+  var p = descQ[descIdx]; if(!p) return;
+  descR[p.k] = el("descInput").value.trim();
+  try{ await jsend("PUT","/descoberta",{respostas: descR}); el("descHint").textContent = "Resposta salva."; }
+  catch(e){ el("descHint").textContent = "Erro ao salvar: " + e.message; return; }
+  renderDesc();
+  if(avanca && descIdx < descQ.length - 1){ descIdx++; renderDesc(); }
+}
+
+var SWOT_META = [["forca","Forças","var(--good)"],["fraqueza","Fraquezas","var(--crit)"],
+                 ["oportunidade","Oportunidades","var(--accent)"],["ameaca","Ameaças","var(--warn)"]];
+var swotCache = [];
+async function refreshSwot(){
+  try{ var r = await jget("/swot"); swotCache = r.itens || []; renderSwot(); }catch(_){}
+}
+function renderSwot(){
+  el("swotGrid").innerHTML = SWOT_META.map(function(m){
+    var itens = swotCache.filter(function(i){ return i.quadrante === m[0]; });
+    return '<div class="swot-q"><h4 style="color:'+m[2]+'">'+m[1]+'</h4><ul>'+
+      itens.map(function(i){ return '<li><span>'+i.texto+'</span><button class="ib danger" data-sid="'+i.id+'" title="Remover">×</button></li>'; }).join("")+
+      '</ul><input placeholder="Adicionar item e Enter…" data-squad="'+m[0]+'"></div>';
+  }).join("");
+}
+
+var radarAreas = [], radarNotas = {};
+async function refreshRadar(){
+  try{ var r = await jget("/radar"); radarAreas = r.areas || []; radarNotas = r.notas || {}; renderRadar(); }catch(_){}
+}
+function renderRadar(){
+  el("radarBody").innerHTML = radarAreas.map(function(a){
+    var n = radarNotas[a] != null ? radarNotas[a] : 5;
+    return '<div class="radar-row"><span>'+a+'</span>'+
+      '<input type="range" min="0" max="10" value="'+n+'" data-area="'+a+'">'+
+      '<b class="num" data-val="'+a+'">'+n+'</b></div>';
+  }).join("");
+}
+
+var ACAO_ST = {planejada:"Planejada", em_andamento:"Em andamento", concluida:"Concluída", cancelada:"Cancelada"};
+var ACAO_STCLS = {planejada:"st-aberto", em_andamento:"st-em_andamento", concluida:"st-resolvido", cancelada:"st-descartado"};
+var acoesCache = [];
+async function refreshAcoes(){
+  try{ var r = await jget("/acoes"); acoesCache = r.acoes || []; renderAcoes(); }catch(_){}
+}
+function renderAcoes(){
+  var tb = el("acoesTbl").querySelector("tbody");
+  if(!acoesCache.length){
+    tb.innerHTML = '<tr><td colspan="7" class="hint">Nenhuma ação ainda. Clique em ＋ Ação.</td></tr>'; return;
+  }
+  tb.innerHTML = acoesCache.map(function(a, i){
+    return "<tr><td style=\"white-space:normal;min-width:220px\">"+a.oque+"</td>"+
+      "<td>"+(a.quem||"—")+"</td><td>"+(a.quando||"—")+"</td>"+
+      "<td>"+(a.quanto!=null ? "R$ "+(+a.quanto).toLocaleString("pt-BR") : "—")+"</td>"+
+      "<td>"+(a.objetivo||"—")+"</td>"+
+      '<td><span class="chipst '+(ACAO_STCLS[a.status]||"")+'">'+(ACAO_ST[a.status]||a.status)+'</span></td>'+
+      '<td style="text-align:right"><span class="obj-actions">'+
+      '<button class="ib" data-aact="e" data-ai="'+i+'" title="Editar">✎</button>'+
+      '<button class="ib danger" data-aact="x" data-ai="'+i+'" title="Excluir">×</button></span></td></tr>';
+  }).join("");
+}
+function editorAcao(a, anchor){
+  openEditor(anchor, [
+    {k:"oque", label:"O quê", cls:"w-lg", value:a?a.oque:"", ph:"ex.: Reduzir ruptura de bebidas no fim de semana"},
+    {k:"porque", label:"Por quê", cls:"w-lg", value:a?(a.porque||""):""},
+    {k:"onde", label:"Onde", cls:"w-sm", value:a?(a.onde||""):""},
+    {k:"quando", label:"Quando", type:"date", value:a?(a.quando||""):""},
+    {k:"quem", label:"Quem", cls:"w-sm", value:a?(a.quem||""):""},
+    {k:"como", label:"Como", cls:"w-lg", value:a?(a.como||""):""},
+    {k:"quanto", label:"Quanto (R$)", cls:"w-sm", type:"number", value:a&&a.quanto!=null?a.quanto:""},
+    {k:"status", label:"Status", type:"select", value:a?a.status:"planejada",
+      options:[["planejada","Planejada"],["em_andamento","Em andamento"],["concluida","Concluída"],["cancelada","Cancelada"]]},
+  ], async function(i){
+    if(!i.oque.value.trim()) throw new Error("Descreva a ação (O quê).");
+    var body = {oque:i.oque.value.trim(), porque:i.porque.value.trim()||null,
+      onde:i.onde.value.trim()||null, quando:i.quando.value||null,
+      quem:i.quem.value.trim()||null, como:i.como.value.trim()||null,
+      quanto:i.quanto.value!=="" ? +i.quanto.value : null,
+      status:i.status.value, objetivo_id:a?a.objetivo_id:null};
+    if(a) await jsend("PUT","/acoes/"+a.id, body);
+    else await jsend("POST","/acoes", body);
+    refreshAcoes();
+  }, a?"Salvar":"Criar");
 }
 
 var alertCache = [];
@@ -687,12 +911,16 @@ function showLogin(msg){
   el("cfg").classList.add("hide");
   el("content").classList.add("hide");
   el("status").classList.add("hide");
+  el("tabs").classList.add("hide");
+  el("plano").classList.add("hide");
+  planoCarregado = false; TAB = "painel";
   el("tenantNome").textContent = "Painel Estratégico";
   el("loginErr").textContent = msg || "";
 }
 function showApp(tenantNome){
   el("login").classList.add("hide");
   el("cfg").classList.remove("hide");
+  el("tabs").classList.remove("hide");
   el("tenantNome").textContent = tenantNome;
 }
 function logout(msg){ setToken(null); showLogin(msg); }
@@ -746,6 +974,67 @@ el("empresa").addEventListener("change", function(){ if(el("empresa").value) loa
 el("okrAdd").addEventListener("click", novoObjetivo);
 el("fcaAdd").addEventListener("click", function(){ editorFca(null, el("fcaAdd").closest("header")); });
 el("userAdd").addEventListener("click", function(){ editorUsuario(null, el("userAdd").closest("header")); });
+el("tabs").addEventListener("click", function(e){
+  var b = e.target.closest(".tab"); if(!b) return;
+  showTab(b.getAttribute("data-tab"));
+});
+el("descSalvar").addEventListener("click", function(){ descSave(true); });
+el("descAnt").addEventListener("click", function(){ descIdx--; renderDesc(); });
+el("descProx").addEventListener("click", function(){ descIdx++; renderDesc(); });
+el("descGerar").addEventListener("click", async function(){
+  el("descHint").textContent = "Gerando resumo…";
+  try{
+    var r = await jsend("POST","/descoberta/resumo");
+    el("descResumo").textContent = r.resumo;
+    el("descResumo").classList.remove("hide");
+    el("descHint").textContent = r.fonte==="ia" ? "Resumo gerado por IA." : "Resumo gerado (modelo).";
+  }catch(e){ el("descHint").textContent = e.message; }
+});
+el("dirSalvar").addEventListener("click", async function(){
+  try{
+    await jsend("PUT","/direcao",{proposito:el("dirProposito").value.trim()||null,
+      visao:el("dirVisao").value.trim()||null, valores:el("dirValores").value.trim()||null,
+      objetivo_lp:el("dirObjetivo").value.trim()||null});
+    el("dirSalvar").textContent = "Salvo ✓";
+    setTimeout(function(){ el("dirSalvar").textContent = "Salvar"; }, 1500);
+  }catch(e){ window.alert("Não foi possível salvar: "+e.message); }
+});
+el("swotGrid").addEventListener("keydown", function(e){
+  if(e.key !== "Enter") return;
+  var inp = e.target.closest("input[data-squad]"); if(!inp || !inp.value.trim()) return;
+  jsend("POST","/swot",{quadrante:inp.getAttribute("data-squad"), texto:inp.value.trim()})
+    .then(refreshSwot).catch(function(err){ window.alert(err.message); });
+});
+el("swotGrid").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-sid]"); if(!b) return;
+  jsend("DELETE","/swot/"+b.getAttribute("data-sid")).then(refreshSwot)
+    .catch(function(err){ window.alert(err.message); });
+});
+el("radarBody").addEventListener("input", function(e){
+  var r = e.target.closest("input[data-area]"); if(!r) return;
+  var v = document.querySelector('b[data-val="'+r.getAttribute("data-area")+'"]');
+  if(v) v.textContent = r.value;
+});
+el("radarSalvar").addEventListener("click", async function(){
+  var notas = {};
+  Array.prototype.forEach.call(document.querySelectorAll("#radarBody input[data-area]"), function(r){
+    notas[r.getAttribute("data-area")] = +r.value;
+  });
+  try{ await jsend("PUT","/radar",{notas:notas});
+    el("radarSalvar").textContent = "Salvo ✓";
+    setTimeout(function(){ el("radarSalvar").textContent = "Salvar notas"; }, 1500);
+  }catch(e){ window.alert("Não foi possível salvar: "+e.message); }
+});
+el("acaoAdd").addEventListener("click", function(){ editorAcao(null, el("acaoAdd").closest("header")); });
+el("acoesTbl").addEventListener("click", function(e){
+  var b = e.target.closest("button.ib"); if(!b) return;
+  var a = acoesCache[+b.getAttribute("data-ai")]; if(!a) return;
+  if(b.getAttribute("data-aact")==="e") editorAcao(a, el("acoesTbl").parentNode);
+  else if(window.confirm("Excluir esta ação?")){
+    jsend("DELETE","/acoes/"+a.id).then(refreshAcoes)
+      .catch(function(err){ window.alert("Não foi possível excluir: "+err.message); });
+  }
+});
 el("usersTbl").addEventListener("click", function(e){
   var b = e.target.closest("button.ib"); if(!b) return;
   var u = usersCache[+b.getAttribute("data-ui")]; if(!u) return;

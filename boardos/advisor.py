@@ -76,3 +76,47 @@ def gerar_insight(contexto: Dict, cache_key: Optional[str] = None) -> Optional[s
         return texto
     except Exception:
         return None  # qualquer falha => fallback estatístico silencioso
+
+
+SYSTEM_DESCOBERTA = """Você é o BoardOS Advisor. Um CEO de supermercado respondeu
+à Entrevista de Descoberta. Gere o documento final em português do Brasil, claro
+e direto, texto puro (títulos em MAIÚSCULAS, sem markdown), nesta estrutura:
+
+RESUMO EXECUTIVO (3–5 linhas)
+O QUE A REDE FAZ
+PROBLEMA QUE RESOLVE
+PÚBLICO-ALVO
+DIFERENCIAIS COMPETITIVOS
+COMO GANHA DINHEIRO
+POSICIONAMENTO (uma frase)
+EXPECTATIVAS DO PLANO ESTRATÉGICO (metas do ano, maior gargalo, sucesso em 12
+meses, decisões a apoiar, KPIs, usuários e cadência, fonte dos dados)
+
+Aponte inconsistências relevantes numa linha final "ATENÇÃO:" apenas se existirem.
+Use somente o que foi respondido; não invente fatos nem números. Máx. ~250 palavras."""
+
+
+def gerar_resumo_descoberta(perguntas_respostas: Dict) -> Optional[str]:
+    """Documento da Etapa 3 via IA. None => usar o template de fallback."""
+    if not disponivel():
+        return None
+    try:
+        client = anthropic.Anthropic()
+        resp = client.messages.create(
+            model=MODEL,
+            max_tokens=1500,
+            output_config={"effort": "low"},
+            system=SYSTEM_DESCOBERTA,
+            messages=[{
+                "role": "user",
+                "content": ("Perguntas e respostas da entrevista (JSON):\n"
+                            + json.dumps(perguntas_respostas, ensure_ascii=False)
+                            + "\n\nGere o documento."),
+            }],
+        )
+        if resp.stop_reason == "refusal":
+            return None
+        texto = "".join(b.text for b in resp.content if b.type == "text").strip()
+        return texto or None
+    except Exception:
+        return None

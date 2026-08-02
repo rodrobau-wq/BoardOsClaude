@@ -13,14 +13,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from typing import Optional  # noqa: E402
+from typing import Dict, Optional  # noqa: E402
 
 from fastapi import Depends, FastAPI, Header, HTTPException  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from boardos import advisor, comparison  # noqa: E402
+from boardos import advisor, comparison, descoberta as desc  # noqa: E402
 from boardos.auth import decode_token, hash_password, make_token, verify_password  # noqa: E402
 from boardos.db import platform_session, tenant_session  # noqa: E402
 
@@ -414,6 +414,228 @@ def lojas_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
     with tenant_session(tid) as cur:
         lojas = _lojas_mes(cur, ano, mes)
     return {"periodo": f"{ano}-{mes:02d}", "lojas": lojas}
+
+
+# ---------------------------------------- módulo de Plano (1.2–1.5)
+class DescobertaIn(BaseModel):
+    respostas: Dict[str, str]
+
+
+class DirecaoIn(BaseModel):
+    proposito: Optional[str] = None
+    visao: Optional[str] = None
+    valores: Optional[str] = None
+    objetivo_lp: Optional[str] = None
+
+
+class SwotIn(BaseModel):
+    quadrante: str
+    texto: str
+
+
+class RadarIn(BaseModel):
+    notas: Dict[str, int]
+
+
+class AcaoIn(BaseModel):
+    oque: str
+    porque: Optional[str] = None
+    onde: Optional[str] = None
+    quando: Optional[str] = None
+    quem: Optional[str] = None
+    como: Optional[str] = None
+    quanto: Optional[float] = None
+    status: str = "planejada"
+    objetivo_id: Optional[str] = None
+
+
+RADAR_AREAS = ["Comercial/Vendas", "Marketing/Fidelização", "Operação/Pessoas",
+               "Financeiro", "Inovação"]
+
+
+@app.get("/descoberta")
+def descoberta_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT respostas, resumo FROM descoberta WHERE tenant_id=%s", (tid,))
+        row = cur.fetchone()
+    return {"perguntas": desc.PERGUNTAS, "obrigatorias": list(desc.OBRIGATORIAS),
+            "respostas": (row[0] if row else {}) or {},
+            "resumo": row[1] if row else None}
+
+
+@app.put("/descoberta")
+def descoberta_put(body: DescobertaIn, user: dict = Depends(current),
+                   tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    import json as _json
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "INSERT INTO descoberta (tenant_id, respostas, atualizado_em) "
+            "VALUES (%s,%s,now()) ON CONFLICT (tenant_id) DO UPDATE SET "
+            "respostas=EXCLUDED.respostas, atualizado_em=now()",
+            (tid, _json.dumps(body.respostas)))
+    return {"ok": True}
+
+
+@app.post("/descoberta/resumo")
+def descoberta_resumo(user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT respostas FROM descoberta WHERE tenant_id=%s", (tid,))
+        row = cur.fetchone()
+        respostas = (row[0] if row else {}) or {}
+        faltam = [k for k in desc.OBRIGATORIAS if not (respostas.get(k) or "").strip()]
+        if faltam:
+            raise HTTPException(400, f"Responda antes as perguntas obrigatórias: {', '.join(faltam)}.")
+        qa = {p["k"]: {"pergunta": p["q"], "resposta": respostas.get(p["k"], "")}
+              for p in desc.PERGUNTAS}
+        texto = advisor.gerar_resumo_descoberta(qa)
+        fonte = "ia" if texto else "modelo"
+        if not texto:
+            texto = desc.resumo_fallback(respostas)
+        cur.execute("UPDATE descoberta SET resumo=%s, atualizado_em=now() WHERE tenant_id=%s",
+                    (texto, tid))
+    return {"resumo": texto, "fonte": fonte}
+
+
+@app.get("/direcao")
+def direcao_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT proposito, visao, valores, objetivo_lp "
+                    "FROM direcao_estrategica WHERE tenant_id=%s", (tid,))
+        row = cur.fetchone()
+    campos = ["proposito", "visao", "valores", "objetivo_lp"]
+    return dict(zip(campos, row)) if row else {c: None for c in campos}
+
+
+@app.put("/direcao")
+def direcao_put(body: DirecaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "INSERT INTO direcao_estrategica (tenant_id, proposito, visao, valores, objetivo_lp, atualizado_em) "
+            "VALUES (%s,%s,%s,%s,%s,now()) ON CONFLICT (tenant_id) DO UPDATE SET "
+            "proposito=EXCLUDED.proposito, visao=EXCLUDED.visao, valores=EXCLUDED.valores, "
+            "objetivo_lp=EXCLUDED.objetivo_lp, atualizado_em=now()",
+            (tid, body.proposito, body.visao, body.valores, body.objetivo_lp))
+    return {"ok": True}
+
+
+@app.get("/swot")
+def swot_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT id, quadrante, texto FROM swot_item ORDER BY quadrante, ordem, criado_em")
+        itens = [{"id": str(r[0]), "quadrante": r[1], "texto": r[2]} for r in cur.fetchall()]
+    return {"itens": itens}
+
+
+@app.post("/swot")
+def swot_post(body: SwotIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if body.quadrante not in ("forca", "fraqueza", "oportunidade", "ameaca"):
+        raise HTTPException(400, "Quadrante inválido.")
+    if not body.texto.strip():
+        raise HTTPException(400, "Escreva o item.")
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "INSERT INTO swot_item (tenant_id, quadrante, texto, ordem) "
+            "SELECT %s,%s,%s, COALESCE(max(ordem)+1,0) FROM swot_item WHERE quadrante=%s "
+            "RETURNING id",
+            (tid, body.quadrante, body.texto.strip(), body.quadrante))
+        sid = cur.fetchone()[0]
+    return {"id": str(sid)}
+
+
+@app.delete("/swot/{sid}")
+def swot_delete(sid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM swot_item WHERE id=%s", (sid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Item não encontrado.")
+    return {"ok": True}
+
+
+@app.get("/radar")
+def radar_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT area, nota FROM radar_nota")
+        notas = {r[0]: r[1] for r in cur.fetchall()}
+    return {"areas": RADAR_AREAS, "notas": notas}
+
+
+@app.put("/radar")
+def radar_put(body: RadarIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        for area, nota in body.notas.items():
+            if not (0 <= int(nota) <= 10):
+                raise HTTPException(400, f"Nota de {area} deve ser 0–10.")
+            cur.execute(
+                "INSERT INTO radar_nota (tenant_id, area, nota) VALUES (%s,%s,%s) "
+                "ON CONFLICT (tenant_id, area) DO UPDATE SET nota=EXCLUDED.nota",
+                (tid, area, int(nota)))
+    return {"ok": True}
+
+
+@app.get("/acoes")
+def acoes_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "SELECT a.id, a.oque, a.porque, a.onde, a.quando, a.quem, a.como, a.quanto, "
+            "a.status, a.objetivo_id, o.titulo "
+            "FROM acao_5w2h a LEFT JOIN okr_objetivo o ON o.id=a.objetivo_id "
+            "ORDER BY (a.status IN ('concluida','cancelada')), a.quando NULLS LAST, a.criado_em")
+        cols = ["id", "oque", "porque", "onde", "quando", "quem", "como", "quanto",
+                "status", "objetivo_id", "objetivo"]
+        rows = []
+        for r in cur.fetchall():
+            d = dict(zip(cols, r))
+            d["id"] = str(d["id"])
+            d["quando"] = str(d["quando"]) if d["quando"] else None
+            d["quanto"] = float(d["quanto"]) if d["quanto"] is not None else None
+            d["objetivo_id"] = str(d["objetivo_id"]) if d["objetivo_id"] else None
+            rows.append(d)
+    return {"acoes": rows}
+
+
+@app.post("/acoes")
+def acoes_post(body: AcaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if not body.oque.strip():
+        raise HTTPException(400, "Descreva a ação (O quê).")
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "INSERT INTO acao_5w2h (tenant_id, objetivo_id, oque, porque, onde, quando, quem, como, quanto, status) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (tid, body.objetivo_id, body.oque.strip(), body.porque, body.onde,
+             body.quando or None, body.quem, body.como, body.quanto, body.status))
+        aid = cur.fetchone()[0]
+    return {"id": str(aid)}
+
+
+@app.put("/acoes/{aid}")
+def acoes_put(aid: str, body: AcaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "UPDATE acao_5w2h SET oque=%s, porque=%s, onde=%s, quando=%s, quem=%s, "
+            "como=%s, quanto=%s, status=%s, objetivo_id=%s WHERE id=%s",
+            (body.oque.strip(), body.porque, body.onde, body.quando or None,
+             body.quem, body.como, body.quanto, body.status, body.objetivo_id, aid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Ação não encontrada.")
+    return {"ok": True}
+
+
+@app.delete("/acoes/{aid}")
+def acoes_delete(aid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM acao_5w2h WHERE id=%s", (aid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Ação não encontrada.")
+    return {"ok": True}
 
 
 # ------------------------------------------------- gestão de usuários
