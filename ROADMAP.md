@@ -10,8 +10,12 @@
 | Fundação (M0) | Multi-tenant + RLS, grão cupom/item, calendário duplo, ingestão idempotente, medidor de uso |
 | Motor (M1) | Comparação YoY civil-vs-varejo com ajuste de calendário + testes |
 | Painel (M2) | Painel visual ao vivo, toggle Civil↔Varejo, gráfico alinhado, multiempresa |
-| Plano (M3 parcial) | Metas/OKRs (visualização) com KR automático do dado real |
-| Segurança | Login JWT, senha hash, tenant derivado do token, super-admin (rodrobau@gmail.com) |
+| Plano (M3 parcial) | Metas/OKRs com **edição na tela** (1.1 ✅) e KR automático do dado real |
+| Execução | **Ciclo FCA + alertas** calculados do dado real (1.6 ✅) |
+| IA | **Advisor com Claude** + fallback estatístico (2.1 ✅ — ativa ao setar ANTHROPIC_API_KEY no Render) |
+| Operação | **Gestão de usuários** — convites, papéis, troca de senha (4.1 ✅) |
+| Segurança | Login JWT, senha hash, tenant do token, super-admin, **rate-limit no login + CORS restrito** (5.1 parcial ✅) |
+| Qualidade | **Smoke test de produção** — scripts/test_api_live.py, 15 checagens (5.2 ✅) |
 | Drill-down | Resumo por loja (civil/varejo) |
 | Deploy | Render (API + painel + Postgres pago), GitHub CI por push |
 | CRM | Conector com layout assumido + onboarding demo (aguarda amostra real) |
