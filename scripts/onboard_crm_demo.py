@@ -66,10 +66,10 @@ def seed_categorias_gold(tenant_id: str) -> None:
                   (tenant_id, data, loja_id, categoria_id, faturamento_bruto,
                    faturamento_liq, custo, margem, itens, cupons, qtd)
                 SELECT tenant_id, data, loja_id, %s,
-                       round(faturamento_bruto*%s*f,2), round(faturamento_liq*%s*f,2),
-                       round(custo*%s*f,2), round(margem*%s*f,2),
-                       greatest(1, round(itens*%s*f)), greatest(1, round(cupons*%s*f)),
-                       round(qtd*%s*f)
+                       round((faturamento_bruto*%s*f)::numeric,2), round((faturamento_liq*%s*f)::numeric,2),
+                       round((custo*%s*f)::numeric,2), round((margem*%s*f)::numeric,2),
+                       greatest(1, round((itens*%s*f)::numeric)), greatest(1, round((cupons*%s*f)::numeric)),
+                       round((qtd*%s*f)::numeric,2)
                   FROM (SELECT g.*,
                                0.86 + (abs(hashtext(g.data::text || g.loja_id::text || %s)) %% 280)/1000.0 AS f
                           FROM gold_venda_diaria g WHERE g.categoria_id IS NULL) sub
@@ -153,7 +153,10 @@ def main():
             continue
         res = crm.import_vendas_diarias_rows(tid, gen_vendas(perfil, salt * 97))
         seed_okrs(tid)
-        seed_categorias_gold(tid)
+        try:
+            seed_categorias_gold(tid)
+        except Exception as e:  # não derruba o resto do seed; loga a causa
+            print(f"  AVISO: seed de categorias falhou para {ext}: {e}")
         print(f"  {ext} ({tid}): {res['linhas']} linhas de gold + OKRs + categorias demo")
 
     # 4) usuários de login (senha com hash) — um CEO por empresa + super-admin
