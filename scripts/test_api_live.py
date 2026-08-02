@@ -150,6 +150,19 @@ def main():
     st, _ = req("DELETE", "/acoes/" + a.get("id", "x"), token=tok)
     check("acoes DELETE", st == 200)
 
+    # 4.2 painel super-admin
+    st, mm = req("GET", "/admin/metricas", token=atok)
+    check("admin/metricas 200", st == 200 and mm.get("totais", {}).get("tenants", 0) >= 3,
+          f"MRR={mm.get('totais', {}).get('mrr_estimado_cent', 0)/100:.0f}")
+    st, _ = req("GET", "/admin/metricas", token=tok)
+    check("CEO em /admin/metricas => 403", st == 403)
+    st, nt = req("POST", "/tenants", token=atok, body={"nome": "TESTE Smoke Ltda"})
+    check("tenant POST", st == 200 and nt.get("id"))
+    if nt.get("id"):
+        st, _ = req("PUT", "/tenants/" + nt["id"], token=atok,
+                    body={"nome": "TESTE Smoke Ltda", "status": "cancelado"})
+        check("tenant PUT (suspender)", st == 200)
+
     print(f"\n{_ok} ok, {_fail} falha(s).")
     sys.exit(1 if _fail else 0)
 

@@ -114,8 +114,11 @@ def login(body: LoginIn):
     tenant = None
     if tenant_id:
         with platform_session() as cur:
-            cur.execute("SELECT nome FROM platform.tenant WHERE id=%s", (tenant_id,))
-            tenant = {"id": tenant_id, "nome": (cur.fetchone() or ["—"])[0]}
+            cur.execute("SELECT nome, status FROM platform.tenant WHERE id=%s", (tenant_id,))
+            trow = cur.fetchone()
+        if trow and trow[1] == "cancelado":
+            raise HTTPException(403, "O acesso desta empresa está suspenso. Fale com o suporte BoardOS.")
+        tenant = {"id": tenant_id, "nome": trow[0] if trow else "—"}
     token = make_token(sub=row[0], nome=row[2], tenant_id=tenant_id, papel=row[4])
     return {"token": token,
             "user": {"email": row[0], "nome": row[2], "papel": row[4]},
@@ -133,15 +136,116 @@ def me(user: dict = Depends(current)):
             "tenant": tenant}
 
 
+def _super(user: dict) -> None:
+    if user.get("papel") != "super_admin":
+        raise HTTPException(403, "Acesso restrito ao administrador da plataforma.")
+
+
 @app.get("/tenants")
 def tenants(user: dict = Depends(current)):
     """Lista todas as empresas — SOMENTE para o super-admin da plataforma."""
-    if user.get("papel") != "super_admin":
-        raise HTTPException(403, "Acesso restrito ao administrador da plataforma.")
+    _super(user)
     with platform_session() as cur:
         cur.execute("SELECT id, nome, status FROM platform.tenant ORDER BY nome")
         rows = [{"id": str(r[0]), "nome": r[1], "status": r[2]} for r in cur.fetchall()]
     return {"tenants": rows}
+
+
+class TenantIn(BaseModel):
+    nome: str
+    status: str = "ativo"
+    admin_email: Optional[str] = None
+    admin_senha: Optional[str] = None
+    admin_nome: Optional[str] = None
+
+
+TENANT_STATUS = ("trial", "ativo", "inadimplente", "cancelado")
+
+
+@app.post("/tenants")
+def tenant_create(body: TenantIn, user: dict = Depends(current)):
+    """Cadastra uma nova empresa (tenant) — opcionalmente já com o admin inicial."""
+    _super(user)
+    nome = body.nome.strip()
+    if not nome:
+        raise HTTPException(400, "Informe o nome da empresa.")
+    if body.status not in TENANT_STATUS:
+        raise HTTPException(400, "Status inválido.")
+    if body.admin_email and (not body.admin_senha or len(body.admin_senha) < 8):
+        raise HTTPException(400, "Senha inicial do admin: mínimo 8 caracteres.")
+    from boardos.crm import slugify
+    with platform_session() as cur:
+        base_slug = slugify(nome)
+        slug = base_slug
+        for i in range(2, 30):
+            cur.execute("SELECT 1 FROM platform.tenant WHERE slug=%s", (slug,))
+            if not cur.fetchone():
+                break
+            slug = f"{base_slug}-{i}"
+        cur.execute(
+            "INSERT INTO platform.tenant (nome, slug, status) VALUES (%s,%s,%s) RETURNING id",
+            (nome, slug, body.status))
+        tid = str(cur.fetchone()[0])
+        cur.execute(
+            "INSERT INTO platform.assinatura (tenant_id, plano, base_mensal_cent, preco_por_1k_cent) "
+            "VALUES (%s,'v0',49900,900)", (tid,))
+        if body.admin_email:
+            email = body.admin_email.strip().lower()
+            cur.execute("SELECT 1 FROM platform.usuario_login WHERE lower(email)=%s", (email,))
+            if cur.fetchone():
+                raise HTTPException(409, "Já existe um usuário com o e-mail do admin.")
+            cur.execute(
+                "INSERT INTO platform.usuario_login (email, senha_hash, nome, tenant_id, papel) "
+                "VALUES (%s,%s,%s,%s,'admin_tenant')",
+                (email, hash_password(body.admin_senha), body.admin_nome, tid))
+    return {"id": tid, "slug": slug}
+
+
+@app.put("/tenants/{tid2}")
+def tenant_update(tid2: str, body: TenantIn, user: dict = Depends(current)):
+    """Edita nome/status da empresa (suspensão = status 'cancelado')."""
+    _super(user)
+    if body.status not in TENANT_STATUS:
+        raise HTTPException(400, "Status inválido.")
+    with platform_session() as cur:
+        cur.execute("UPDATE platform.tenant SET nome=%s, status=%s WHERE id=%s",
+                    (body.nome.strip(), body.status, tid2))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Empresa não encontrada.")
+    return {"ok": True}
+
+
+@app.get("/admin/metricas")
+def admin_metricas(user: dict = Depends(current)):
+    """Métricas da plataforma: por empresa (usuários, uso do mês, receita
+    estimada = base + uso variável) e totais (tenants ativos, MRR estimado)."""
+    _super(user)
+    with platform_session() as cur:
+        cur.execute(
+            """
+            SELECT t.id, t.nome, t.status,
+                   COALESCE(a.base_mensal_cent, 0), COALESCE(a.preco_por_1k_cent, 0),
+                   (SELECT count(*) FROM platform.usuario_login u WHERE u.tenant_id = t.id),
+                   COALESCE((SELECT m.registros FROM platform.medidor_uso m
+                              WHERE m.tenant_id = t.id
+                                AND m.competencia = date_trunc('month', now())::date), 0)
+              FROM platform.tenant t
+              LEFT JOIN platform.assinatura a ON a.tenant_id = t.id
+             ORDER BY t.nome
+            """)
+        empresas = []
+        mrr = 0
+        for tid_, nome, status, base_c, preco1k_c, nusers, registros in cur.fetchall():
+            receita = int(base_c) + int(int(registros) / 1000 * int(preco1k_c))
+            if status in ("ativo", "trial"):
+                mrr += receita
+            empresas.append({"id": str(tid_), "nome": nome, "status": status,
+                             "usuarios": int(nusers), "registros_mes": int(registros),
+                             "base_cent": int(base_c), "receita_estimada_cent": receita})
+    ativos = sum(1 for e in empresas if e["status"] in ("ativo", "trial"))
+    return {"empresas": empresas,
+            "totais": {"tenants": len(empresas), "ativos": ativos,
+                       "mrr_estimado_cent": mrr}}
 
 
 # ------------------------------------------------------------------ OKRs

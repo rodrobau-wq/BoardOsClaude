@@ -177,6 +177,7 @@
   <div class="tabs hide" id="tabs">
     <button class="tab on" data-tab="painel">Painel</button>
     <button class="tab" data-tab="plano">Plano</button>
+    <button class="tab hide" data-tab="admin" id="tabAdmin">Admin</button>
   </div>
   <div class="cfg hide" id="cfg">
     <select id="empresa" class="hide"></select>
@@ -253,6 +254,21 @@
       <div class="body" style="overflow-x:auto">
         <table class="tbl" id="acoesTbl">
           <thead><tr><th>O quê</th><th>Quem</th><th>Quando</th><th>Custo</th><th>Meta ligada</th><th>Status</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <div id="admin" class="hide">
+    <div class="kpis" id="admKpis" style="margin-bottom:16px"></div>
+    <section class="card">
+      <header><h2>Clientes da plataforma</h2>
+        <button class="btn ghost" id="cliAdd" style="padding:6px 12px;font-size:12.5px">＋ Cliente</button>
+      </header>
+      <div class="body" style="overflow-x:auto">
+        <table class="tbl" id="cliTbl">
+          <thead><tr><th>Empresa</th><th>Status</th><th>Usuários</th><th>Registros no mês</th><th>Receita est./mês</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -601,8 +617,70 @@ function showTab(t){
     b.classList.toggle("on", b.getAttribute("data-tab") === t);
   });
   el("plano").classList.toggle("hide", t !== "plano");
+  el("admin").classList.toggle("hide", t !== "admin");
   if(t === "painel"){ if(last) el("content").classList.remove("hide"); }
-  else { el("content").classList.add("hide"); if(!planoCarregado) loadPlano(); }
+  else el("content").classList.add("hide");
+  if(t === "plano" && !planoCarregado) loadPlano();
+  if(t === "admin") loadAdmin();
+}
+
+var CLI_ST = {trial:"Trial", ativo:"Ativo", inadimplente:"Inadimplente", cancelado:"Suspenso"};
+var CLI_STCLS = {trial:"st-em_andamento", ativo:"st-resolvido", inadimplente:"st-aberto", cancelado:"st-descartado"};
+var cliCache = [];
+function brlCent(c){ return "R$ " + (c/100).toLocaleString("pt-BR", {minimumFractionDigits:2}); }
+async function loadAdmin(){
+  try{
+    var m = await jget("/admin/metricas");
+    cliCache = m.empresas || [];
+    var t = m.totais || {};
+    el("admKpis").innerHTML = [
+      ["Clientes", t.tenants||0], ["Ativos", t.ativos||0],
+      ["MRR estimado", brlCent(t.mrr_estimado_cent||0)]
+    ].map(function(x){
+      return '<div class="kpi"><div class="lbl">'+x[0]+'</div><div class="val num">'+x[1]+'</div></div>';
+    }).join("");
+    var tb = el("cliTbl").querySelector("tbody");
+    tb.innerHTML = cliCache.map(function(c2, i){
+      return "<tr><td>"+c2.nome+"</td>"+
+        '<td><span class="chipst '+(CLI_STCLS[c2.status]||"")+'">'+(CLI_ST[c2.status]||c2.status)+'</span></td>'+
+        '<td class="num">'+c2.usuarios+'</td>'+
+        '<td class="num">'+c2.registros_mes.toLocaleString("pt-BR")+'</td>'+
+        '<td class="num">'+brlCent(c2.receita_estimada_cent)+'</td>'+
+        '<td style="text-align:right"><span class="obj-actions">'+
+        '<button class="ib" data-cact="e" data-ci="'+i+'" title="Editar">✎</button></span></td></tr>';
+    }).join("") || '<tr><td colspan="6" class="hint">Nenhum cliente ainda.</td></tr>';
+  }catch(e){
+    el("admKpis").innerHTML = '<span class="hint">Não foi possível carregar: '+e.message+'</span>';
+  }
+}
+function editorCliente(c2, anchor){
+  var fields = [{k:"nome", label:"Empresa", cls:"w-lg", value:c2?c2.nome:"", ph:"ex.: Supermercados Silva"}];
+  if(c2){
+    fields.push({k:"status", label:"Status", type:"select", value:c2.status,
+      options:[["trial","Trial"],["ativo","Ativo"],["inadimplente","Inadimplente"],["cancelado","Suspenso"]]});
+  } else {
+    fields.push({k:"admin_email", label:"E-mail do admin", cls:"w-lg", ph:"dono@empresa.com"});
+    fields.push({k:"admin_nome", label:"Nome do admin", cls:"w-sm"});
+    fields.push({k:"admin_senha", label:"Senha inicial", cls:"w-sm", type:"password"});
+  }
+  openEditor(anchor, fields, async function(i){
+    if(!i.nome.value.trim()) throw new Error("Informe o nome da empresa.");
+    if(c2){
+      await jsend("PUT","/tenants/"+c2.id, {nome:i.nome.value.trim(), status:i.status.value});
+    } else {
+      var body = {nome:i.nome.value.trim(), status:"ativo"};
+      if(i.admin_email.value.trim()){
+        if(!i.admin_senha.value || i.admin_senha.value.length<8)
+          throw new Error("Senha inicial do admin: mínimo 8 caracteres.");
+        body.admin_email = i.admin_email.value.trim();
+        body.admin_nome = i.admin_nome.value.trim()||null;
+        body.admin_senha = i.admin_senha.value;
+      }
+      await jsend("POST","/tenants", body);
+      refreshEmpresaSelect();   // novo cliente entra no seletor do topo
+    }
+    loadAdmin();
+  }, c2?"Salvar":"Cadastrar");
 }
 
 var descQ = [], descR = {}, descObrig = [], descIdx = 0;
@@ -969,6 +1047,8 @@ function showLogin(msg){
   el("status").classList.add("hide");
   el("tabs").classList.add("hide");
   el("plano").classList.add("hide");
+  el("admin").classList.add("hide");
+  el("tabAdmin").classList.add("hide");
   planoCarregado = false; TAB = "painel";
   el("tenantNome").textContent = "Painel Estratégico";
   el("loginErr").textContent = msg || "";
@@ -996,19 +1076,27 @@ async function entrar(){
   }catch(e){ el("loginErr").textContent = "Erro de conexão (o serviço pode estar acordando). Tente de novo."; }
 }
 
+async function refreshEmpresaSelect(){
+  var emp = el("empresa");
+  try{
+    var r = await jget("/tenants");
+    var sel = emp.value;
+    emp.innerHTML = '<option value="">— escolha a empresa —</option>' +
+      r.tenants.map(function(t){return '<option value="'+t.id+'">'+t.nome+'</option>';}).join("");
+    if(sel) emp.value = sel;
+  }catch(e){ emp.innerHTML = '<option value="">(erro ao listar empresas)</option>'; }
+}
+
 async function enterApp(papel, tenant){
   PAPEL = papel;
   var emp = el("empresa");
+  el("tabAdmin").classList.toggle("hide", papel !== "super_admin");
   if(papel === "super_admin"){
     showApp("Administração da Plataforma");
     emp.classList.remove("hide");
     emp.innerHTML = '<option value="">— carregando empresas… —</option>';
-    try{
-      var r = await jget("/tenants");
-      emp.innerHTML = '<option value="">— escolha a empresa —</option>' +
-        r.tenants.map(function(t){return '<option value="'+t.id+'">'+t.nome+'</option>';}).join("");
-      setStatus("Você é <b>admin da plataforma</b>: escolha a empresa para navegar a base dela.", "info");
-    }catch(e){ emp.innerHTML = '<option value="">(erro ao listar empresas)</option>'; }
+    await refreshEmpresaSelect();
+    setStatus("Você é <b>admin da plataforma</b>: escolha a empresa para navegar a base dela, ou abra a aba <b>Admin</b>.", "info");
   } else {
     emp.classList.add("hide");
     showApp(tenant ? tenant.nome : "—");
@@ -1033,6 +1121,12 @@ el("userAdd").addEventListener("click", function(){ editorUsuario(null, el("user
 el("tabs").addEventListener("click", function(e){
   var b = e.target.closest(".tab"); if(!b) return;
   showTab(b.getAttribute("data-tab"));
+});
+el("cliAdd").addEventListener("click", function(){ editorCliente(null, el("cliAdd").closest("header")); });
+el("cliTbl").addEventListener("click", function(e){
+  var b = e.target.closest("button.ib"); if(!b) return;
+  var c2 = cliCache[+b.getAttribute("data-ci")]; if(!c2) return;
+  editorCliente(c2, el("cliTbl").parentNode);
 });
 el("descSalvar").addEventListener("click", function(){ descSave(true); });
 el("descAnt").addEventListener("click", function(){ descIdx--; renderDesc(); });
