@@ -107,6 +107,26 @@
   .editor .btn{padding:8px 13px;font-size:12.5px}
   .auto-badge{font-size:10px;font-weight:700;color:var(--accent-strong);background:var(--accent-soft);
     border-radius:5px;padding:1px 6px;margin-left:6px;vertical-align:middle}
+  .alerts{display:flex;flex-direction:column;gap:9px}
+  .alert{display:flex;gap:11px;align-items:flex-start;padding:11px 12px;border-radius:11px;border:1px solid var(--border)}
+  .alert.r{background:var(--crit-soft);border-color:color-mix(in srgb,var(--crit) 25%,transparent)}
+  .alert.a{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 25%,transparent)}
+  .alert .ic{flex:none;font-size:15px}
+  .alert.r .ic{color:var(--crit)} .alert.a .ic{color:var(--warn)}
+  .alert .tx{font-size:12.5px;flex:1}
+  .alert .tx b{display:block;margin-bottom:1px;font-size:13px}
+  .chipst{display:inline-block;font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 9px;
+    text-transform:uppercase;letter-spacing:.3px;vertical-align:middle;margin-left:8px}
+  .st-aberto{color:var(--crit);background:var(--crit-soft)}
+  .st-em_andamento{color:var(--warn);background:var(--warn-soft)}
+  .st-resolvido{color:var(--good);background:var(--good-soft)}
+  .st-descartado{color:var(--muted);background:var(--surface-2)}
+  .fca-item{padding:13px 0;border-top:1px solid var(--border)}
+  .fca-item:first-child{border-top:0;padding-top:0}
+  .fca-item h3{margin:0 0 6px;font-size:13.5px}
+  .fca-grid{display:grid;grid-template-columns:64px 1fr;gap:3px 10px;font-size:12.5px}
+  .fca-grid .k{color:var(--faint);font-weight:700;font-size:10.5px;text-transform:uppercase;
+    letter-spacing:.3px;padding-top:2px}
   table.tbl{border-collapse:collapse;width:100%;font-size:13px}
   .tbl th,.tbl td{padding:10px 12px;text-align:right;white-space:nowrap}
   .tbl th:first-child,.tbl td:first-child{text-align:left}
@@ -176,6 +196,11 @@
     <div class="kpis" id="kpis"></div>
 
     <section class="card">
+      <header><h2>Precisa de atenção</h2><span class="sub" id="alertSub"></span></header>
+      <div class="body alerts" id="alertas"></div>
+    </section>
+
+    <section class="card">
       <header><h2>Vendas diárias</h2>
         <div class="legend"><span class="lg-a"><i></i>Atual</span><span class="lg-p"><i></i>Ano anterior</span></div>
       </header>
@@ -200,6 +225,13 @@
         <button class="btn ghost" id="okrAdd" style="padding:6px 12px;font-size:12.5px">＋ Meta</button>
       </header>
       <div class="body" id="okrs"></div>
+    </section>
+
+    <section class="card">
+      <header><h2>Planos de ação — Fato → Causa → Ação</h2>
+        <button class="btn ghost" id="fcaAdd" style="padding:6px 12px;font-size:12.5px">＋ Plano</button>
+      </header>
+      <div class="body" id="fca"></div>
     </section>
 
     <section class="card">
@@ -262,6 +294,9 @@ async function load(){
     catch(_){ el("okrs").innerHTML='<span class="hint">Sem metas cadastradas.</span>'; }
     try{ var lr = await jget("/lojas/resumo?ano="+ano+"&mes="+mes); renderLojas(lr.lojas); }
     catch(_){ renderLojas([]); }
+    try{ var al = await jget("/alertas"); renderAlertas(al.alertas); }
+    catch(_){ renderAlertas([]); }
+    refreshFca();
     el("content").classList.remove("hide");
     setStatus("", "hide");
   }catch(e){
@@ -413,6 +448,85 @@ async function excluir(tipo, id){
   catch(e){ window.alert("Não foi possível excluir: "+e.message); }
 }
 
+var alertCache = [];
+function renderAlertas(itens){
+  alertCache = itens || [];
+  el("alertSub").textContent = alertCache.length
+    ? alertCache.filter(function(a){return a.sev==="r";}).length + " no vermelho"
+    : "";
+  var box = el("alertas");
+  if(!alertCache.length){
+    box.innerHTML = '<span class="hint">Nenhum desvio crítico no momento. 👍</span>'; return;
+  }
+  box.innerHTML = alertCache.map(function(a, i){
+    return '<div class="alert '+a.sev+'"><div class="ic">'+(a.sev==="r"?"▲":"◆")+'</div>'+
+      '<div class="tx"><b>'+a.titulo+'</b>'+a.detalhe+'</div>'+
+      '<button class="ib" data-alert="'+i+'" title="Abrir plano de ação">→ Plano de ação</button></div>';
+  }).join("");
+}
+
+var fcaCache = [];
+async function refreshFca(){
+  try{ var r = await jget("/fca"); renderFca(r.ciclos); }
+  catch(_){ el("fca").innerHTML = '<span class="hint">Sem planos de ação.</span>'; }
+}
+
+var FCA_ST = {aberto:"Aberto", em_andamento:"Em andamento", resolvido:"Resolvido", descartado:"Descartado"};
+function renderFca(ciclos){
+  fcaCache = ciclos || [];
+  var box = el("fca");
+  if(!fcaCache.length){
+    box.innerHTML = '<span class="hint">Nenhum plano de ação. Crie um a partir de um alerta ou pelo botão ＋ Plano.</span>'; return;
+  }
+  box.innerHTML = fcaCache.map(function(c, i){
+    var chip = '<span class="chipst st-'+c.status+'">'+(FCA_ST[c.status]||c.status)+'</span>';
+    var acts = '<span class="obj-actions">'+
+      '<button class="ib" data-fact="e" data-fi="'+i+'" title="Editar">✎</button>'+
+      '<button class="ib danger" data-fact="x" data-fi="'+i+'" title="Excluir">×</button></span>';
+    var rows = [["Fato",c.fato],["Causa",c.causa],["Ação",c.acao],
+      ["Quem",c.responsavel && c.prazo ? c.responsavel+" · até "+c.prazo : (c.responsavel||c.prazo)],
+      ["Resultado",c.resultado]]
+      .filter(function(r){return r[1];})
+      .map(function(r){return '<span class="k">'+r[0]+'</span><span>'+r[1]+'</span>';}).join("");
+    return '<div class="fca-item"><h3>'+c.titulo+chip+acts+'</h3>'+
+           (rows?'<div class="fca-grid">'+rows+'</div>':'')+'</div>';
+  }).join("");
+}
+
+function editorFca(c, anchor){
+  openEditor(anchor, [
+    {k:"titulo", label:"Título", cls:"w-lg", value:c?c.titulo:"", ph:"ex.: Ruptura alta no fim de semana"},
+    {k:"fato", label:"Fato (o dado)", cls:"w-lg", value:c?(c.fato||""):""},
+    {k:"causa", label:"Causa-raiz", cls:"w-lg", value:c?(c.causa||""):""},
+    {k:"acao", label:"Ação corretiva", cls:"w-lg", value:c?(c.acao||""):""},
+    {k:"responsavel", label:"Responsável", cls:"w-sm", value:c?(c.responsavel||""):""},
+    {k:"prazo", label:"Prazo", type:"date", value:c?(c.prazo||""):""},
+    {k:"status", label:"Status", type:"select", value:c?c.status:"aberto",
+      options:[["aberto","Aberto"],["em_andamento","Em andamento"],["resolvido","Resolvido"],["descartado","Descartado"]]},
+    {k:"resultado", label:"Resultado (funcionou?)", cls:"w-lg", value:c?(c.resultado||""):""},
+  ], async function(i){
+    if(!i.titulo.value.trim()) throw new Error("Dê um título ao plano.");
+    var body = {titulo:i.titulo.value.trim(), fato:i.fato.value.trim()||null,
+      causa:i.causa.value.trim()||null, acao:i.acao.value.trim()||null,
+      responsavel:i.responsavel.value.trim()||null, prazo:i.prazo.value||null,
+      status:i.status.value, resultado:i.resultado.value.trim()||null,
+      kpi:c?c.kpi:null, origem:c?c.origem:"manual"};
+    if(c) await jsend("PUT","/fca/"+c.id, body);
+    else await jsend("POST","/fca", body);
+    refreshFca();
+  }, c?"Salvar":"Criar");
+}
+
+async function alertaParaFca(i){
+  var a = alertCache[i]; if(!a) return;
+  try{
+    await jsend("POST","/fca",{titulo:a.titulo, fato:a.detalhe, kpi:a.kpi,
+      origem:"alerta", status:"aberto"});
+    refreshFca();
+    el("fca").scrollIntoView({block:"center"});
+  }catch(e){ window.alert("Não foi possível criar o plano: "+e.message); }
+}
+
 function renderLojas(lojas){
   var tb = el("lojasTbl").querySelector("tbody");
   if(!lojas || !lojas.length){
@@ -561,6 +675,20 @@ el("logout").addEventListener("click", function(){ el("empresa").classList.add("
 el("load").addEventListener("click", load);
 el("empresa").addEventListener("change", function(){ if(el("empresa").value) load(); });
 el("okrAdd").addEventListener("click", novoObjetivo);
+el("fcaAdd").addEventListener("click", function(){ editorFca(null, el("fcaAdd").closest("header")); });
+el("alertas").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-alert]"); if(!b) return;
+  alertaParaFca(+b.getAttribute("data-alert"));
+});
+el("fca").addEventListener("click", function(e){
+  var b = e.target.closest("button.ib"); if(!b) return;
+  var c = fcaCache[+b.getAttribute("data-fi")]; if(!c) return;
+  if(b.getAttribute("data-fact")==="e") editorFca(c, b.closest(".fca-item"));
+  else if(window.confirm("Excluir este plano de ação?")){
+    jsend("DELETE","/fca/"+c.id).then(refreshFca)
+      .catch(function(err){ window.alert("Não foi possível excluir: "+err.message); });
+  }
+});
 el("okrs").addEventListener("click", function(e){
   var b = e.target.closest("button.ib"); if(!b) return;
   var act = b.getAttribute("data-act"), oi = +b.getAttribute("data-oi");

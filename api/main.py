@@ -348,27 +348,25 @@ def comparacao_yoy(ano: int, mes: int, tid: str = Depends(tenant_of)):
 
 
 # --------------------------------------------------- drill-down por loja
-@app.get("/lojas/resumo")
-def lojas_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
-    """Resumo por loja no mês: faturamento + variação YoY civil e ajustada."""
-    with tenant_session(tid) as cur:
-        cur.execute(
-            """
-            SELECT l.id, l.nome, g.data, g.faturamento_liq, g.cupons, g.itens
-              FROM gold_venda_diaria g JOIN loja l ON l.id = g.loja_id
-             WHERE g.categoria_id IS NULL
-               AND date_trunc('month', g.data) IN (make_date(%s,%s,1), make_date(%s,%s,1))
-             ORDER BY l.nome, g.data
-            """,
-            (ano, mes, ano - 1, mes),
-        )
-        por_loja: dict = {}
-        for lid, nome, d, fat, cup, itn in cur.fetchall():
-            key = str(lid)
-            por_loja.setdefault(key, {"nome": nome, "atual": [], "base": []})
-            rec = {"data": d, "faturamento_liq": float(fat),
-                   "cupons": int(cup), "itens": int(itn)}
-            (por_loja[key]["atual"] if d.year == ano else por_loja[key]["base"]).append(rec)
+def _lojas_mes(cur, ano: int, mes: int):
+    """Faturamento + variação YoY (civil/ajustada) por loja no mês."""
+    cur.execute(
+        """
+        SELECT l.id, l.nome, g.data, g.faturamento_liq, g.cupons, g.itens
+          FROM gold_venda_diaria g JOIN loja l ON l.id = g.loja_id
+         WHERE g.categoria_id IS NULL
+           AND date_trunc('month', g.data) IN (make_date(%s,%s,1), make_date(%s,%s,1))
+         ORDER BY l.nome, g.data
+        """,
+        (ano, mes, ano - 1, mes),
+    )
+    por_loja: dict = {}
+    for lid, nome, d, fat, cup, itn in cur.fetchall():
+        key = str(lid)
+        por_loja.setdefault(key, {"nome": nome, "atual": [], "base": []})
+        rec = {"data": d, "faturamento_liq": float(fat),
+               "cupons": int(cup), "itens": int(itn)}
+        (por_loja[key]["atual"] if d.year == ano else por_loja[key]["base"]).append(rec)
 
     lojas = []
     for v in por_loja.values():
@@ -381,4 +379,118 @@ def lojas_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
             item["var_ajustada"] = r["var_ajustada"]
         lojas.append(item)
     lojas.sort(key=lambda x: -x["faturamento"])
+    return lojas
+
+
+@app.get("/lojas/resumo")
+def lojas_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        lojas = _lojas_mes(cur, ano, mes)
     return {"periodo": f"{ano}-{mes:02d}", "lojas": lojas}
+
+
+# ------------------------------------------------- alertas + Ciclo FCA
+@app.get("/alertas")
+def alertas(tid: str = Depends(tenant_of)):
+    """Desvios que precisam de atenção, calculados do dado real.
+    Cada alerta pode virar um ciclo FCA no painel."""
+    itens = []
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT max(data) FROM gold_venda_diaria")
+        row = cur.fetchone()
+        ult = row[0] if row else None
+        yoy = _yoy_do_ultimo_mes(cur)
+        if yoy:
+            if yoy["var_ajustada"] < 0:
+                itens.append({"sev": "r", "kpi": "venda_comparavel",
+                              "titulo": "Venda comparável em queda",
+                              "detalhe": f"Venda ajustada por calendário {yoy['var_ajustada']*100:+.1f}% vs. ano anterior no último mês."})
+            if abs(yoy["efeito_calendario"]) >= 0.02:
+                itens.append({"sev": "a", "kpi": "calendario",
+                              "titulo": "Efeito de calendário relevante",
+                              "detalhe": f"O fechamento civil difere {yoy['efeito_calendario']*100:+.1f}pp do desempenho real — usar a lente Varejo na leitura do mês."})
+        if ult:
+            for lj in _lojas_mes(cur, ult.year, ult.month):
+                if lj["var_ajustada"] is not None and lj["var_ajustada"] <= -0.03:
+                    itens.append({"sev": "r", "kpi": "venda_loja",
+                                  "titulo": f"Queda real de venda — {lj['nome']}",
+                                  "detalhe": f"{lj['nome']}: venda comparável {lj['var_ajustada']*100:+.1f}% vs. ano anterior."})
+        # KRs no vermelho
+        cur.execute("SELECT k.titulo, k.meta, k.atual, k.base, k.direcao, k.fonte, o.titulo "
+                    "FROM okr_kr k JOIN okr_objetivo o ON o.id=k.objetivo_id")
+        for kt, meta, atual, base, direcao, fonte, ot in cur.fetchall():
+            a = float(atual)
+            auto = _kr_auto(fonte, yoy) if fonte else None
+            if auto is not None:
+                a = auto
+            prog, farol = _kr_progresso(meta, a, base, direcao)
+            if farol == "r":
+                itens.append({"sev": "r", "kpi": "okr",
+                              "titulo": f"Meta fora da rota — {kt}",
+                              "detalhe": f"KR \"{kt}\" ({ot}): atual {a:g} vs. meta {float(meta):g} — progresso {prog*100:.0f}%."})
+    return {"alertas": itens}
+
+
+class FcaIn(BaseModel):
+    titulo: str
+    fato: Optional[str] = None
+    causa: Optional[str] = None
+    acao: Optional[str] = None
+    responsavel: Optional[str] = None
+    prazo: Optional[str] = None
+    status: str = "aberto"
+    kpi: Optional[str] = None
+    origem: str = "manual"
+    resultado: Optional[str] = None
+
+
+@app.get("/fca")
+def fca_list(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "SELECT id, titulo, fato, causa, acao, responsavel, prazo, status, kpi, origem, resultado "
+            "FROM fca_ciclo ORDER BY (status IN ('resolvido','descartado')), criado_em DESC")
+        cols = ["id", "titulo", "fato", "causa", "acao", "responsavel", "prazo",
+                "status", "kpi", "origem", "resultado"]
+        rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        for r in rows:
+            r["id"] = str(r["id"])
+            r["prazo"] = str(r["prazo"]) if r["prazo"] else None
+    return {"ciclos": rows}
+
+
+@app.post("/fca")
+def fca_create(body: FcaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "INSERT INTO fca_ciclo (tenant_id, titulo, fato, causa, acao, responsavel, prazo, status, kpi, origem, resultado) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (tid, body.titulo, body.fato, body.causa, body.acao, body.responsavel,
+             body.prazo or None, body.status, body.kpi, body.origem, body.resultado))
+        fid = cur.fetchone()[0]
+    return {"id": str(fid)}
+
+
+@app.put("/fca/{fid}")
+def fca_update(fid: str, body: FcaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "UPDATE fca_ciclo SET titulo=%s, fato=%s, causa=%s, acao=%s, responsavel=%s, "
+            "prazo=%s, status=%s, kpi=%s, resultado=%s, atualizado_em=now() WHERE id=%s",
+            (body.titulo, body.fato, body.causa, body.acao, body.responsavel,
+             body.prazo or None, body.status, body.kpi, body.resultado, fid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Ciclo não encontrado.")
+    return {"ok": True}
+
+
+@app.delete("/fca/{fid}")
+def fca_delete(fid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM fca_ciclo WHERE id=%s", (fid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Ciclo não encontrado.")
+    return {"ok": True}
