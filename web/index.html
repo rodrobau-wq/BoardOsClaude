@@ -247,6 +247,37 @@
       <div class="body" id="radarBody"></div>
     </section>
 
+    <section class="card" style="margin-bottom:16px">
+      <header><h2>Feriados e Datas Sazonais</h2><span class="sub">alimentam o Advisor e o calendário comercial</span></header>
+      <div class="body">
+        <div class="desc-nav" style="margin:0 0 12px">
+          <input type="date" id="ferData" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+          <input id="ferNome" placeholder="ex.: Padroeira da cidade" style="flex:1;min-width:160px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+          <select id="ferTipo" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+            <option value="feriado">Feriado</option><option value="sazonal">Data comercial</option>
+          </select>
+          <button class="btn" id="ferAdd" style="padding:8px 14px;font-size:13px">＋ Adicionar</button>
+        </div>
+        <div id="ferLista" class="hint">Carregando…</div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-bottom:16px">
+      <header><h2>Importar dados de venda (CSV)</h2><span class="sub">grão cupom/item · reenvio não duplica</span></header>
+      <div class="body">
+        <div class="desc-nav" style="margin:0 0 10px">
+          <input type="file" id="upArquivo" accept=".csv,.txt" style="font:13px var(--font);color:var(--ink)">
+          <input id="upLojaCod" placeholder="Código da loja (ex.: C01)" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+          <input id="upLojaNome" placeholder="Nome da loja (opcional)" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:8px 10px;font:13px var(--font)">
+        </div>
+        <div id="upMapa" class="form-grid hide" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr))"></div>
+        <div class="desc-nav">
+          <button class="btn hide" id="upEnviar">Importar</button>
+          <span class="hint" id="upHint">Escolha o arquivo: vou ler o cabeçalho e sugerir o mapa de colunas.</span>
+        </div>
+      </div>
+    </section>
+
     <section class="card">
       <header><h2>Plano de Ação — 5W2H</h2>
         <button class="btn ghost" id="acaoAdd" style="padding:6px 12px;font-size:12.5px">＋ Ação</button>
@@ -352,12 +383,23 @@
     </section>
 
     <section class="card">
-      <header><h2>Resumo do Advisor</h2><span class="sub" id="aiFonte">✦ IA</span></header>
+      <header><h2>Resumo do Advisor</h2>
+        <span style="display:inline-flex;gap:10px;align-items:center">
+          <button class="btn ghost" id="btnResumoExec" style="padding:6px 12px;font-size:12.5px">Resumo executivo</button>
+          <span class="sub" id="aiFonte">✦ IA</span>
+        </span>
+      </header>
       <div class="body" style="display:flex;gap:12px">
         <div class="ai">✦</div>
         <div style="flex:1;min-width:0">
           <div id="aiTexto" class="hide" style="font-size:13.5px;white-space:pre-wrap;line-height:1.55"></div>
           <div class="fca" id="advisorFca"></div>
+          <div style="margin-top:14px;display:flex;gap:8px">
+            <input id="perguntaInput" placeholder="Pergunte aos seus dados… ex.: qual loja mais caiu e por quê?"
+              style="flex:1;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:9px;padding:9px 12px;font:13.5px var(--font)">
+            <button class="btn" id="perguntaBtn" style="padding:8px 14px;font-size:13px">Perguntar</button>
+          </div>
+          <div id="perguntaResp" class="hide" style="margin-top:10px;font-size:13.5px;white-space:pre-wrap;line-height:1.55;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px"></div>
         </div>
       </div>
     </section>
@@ -702,7 +744,7 @@ async function loadPlano(){
     el("dirValores").value = dir.valores || "";
     el("dirObjetivo").value = dir.objetivo_lp || "";
   }catch(_){}
-  refreshSwot(); refreshRadar(); refreshAcoes();
+  refreshSwot(); refreshRadar(); refreshAcoes(); refreshFeriados();
 }
 function firstUnanswered(){
   for(var i=0;i<descQ.length;i++){ if(!(descR[descQ[i].k]||"").trim()) return i; }
@@ -756,6 +798,64 @@ function renderRadar(){
       '<input type="range" min="0" max="10" value="'+n+'" data-area="'+a+'">'+
       '<b class="num" data-val="'+a+'">'+n+'</b></div>';
   }).join("");
+}
+
+async function refreshFeriados(){
+  try{
+    var r = await jget("/feriados");
+    var fs = r.feriados || [];
+    el("ferLista").innerHTML = fs.length
+      ? fs.map(function(f){
+          return '<span style="display:inline-flex;gap:7px;align-items:center;background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:5px 6px 5px 12px;margin:0 6px 6px 0;font-size:12.5px">'
+            + f.data.split("-").reverse().join("/") + " · " + f.nome
+            + (f.tipo === "sazonal" ? ' <span class="auto-badge">comercial</span>' : "")
+            + ' <button class="ib danger" data-fer="'+f.id+'" title="Remover">×</button></span>';
+        }).join("")
+      : '<span class="hint">Nenhuma data cadastrada. Adicione feriados locais e datas comerciais (Natal, Páscoa, aniversário da cidade…).</span>';
+  }catch(_){ el("ferLista").textContent = ""; }
+}
+
+/* upload de CSV com mapeador (4.4) */
+var UP_CAMPOS = [
+  ["data","Data",true,["data","date","dia","dt"]],
+  ["cupom_id","Cupom",true,["cupom","ticket","coo","nf","nota"]],
+  ["seq_item","Seq. do item",false,["seq","sequencia","item"]],
+  ["sku_codigo","SKU/Produto",true,["sku","ean","produto","cod_prod","codigo"]],
+  ["categoria_codigo","Categoria",false,["categoria","secao","depto","departamento"]],
+  ["cliente_id","Cliente",false,["cliente","cpf","id_cliente"]],
+  ["qtd","Quantidade",true,["qtd","quantidade","qtde","quant"]],
+  ["valor_bruto","Valor bruto",false,["bruto","valor_bruto","vl_bruto"]],
+  ["desconto","Desconto",false,["desconto","desc"]],
+  ["valor_liquido","Valor líquido",true,["liquido","valorliquido","valor_liquido","vl_liq","valor","total"]],
+  ["custo","Custo",false,["custo","cmv"]],
+];
+var upCols = [];
+function upMontarMapa(){
+  var box = el("upMapa");
+  box.innerHTML = UP_CAMPOS.map(function(c){
+    var norm = function(s){ return s.toLowerCase().replace(/[^a-z0-9]/g,""); };
+    var guess = "";
+    for(var i=0;i<upCols.length;i++){
+      var n = norm(upCols[i]);
+      if(c[3].some(function(k){ return n.indexOf(norm(k))>=0; })){ guess = upCols[i]; break; }
+    }
+    return '<label>'+c[1]+(c[2]?' *':'')+'<select data-campo="'+c[0]+'" style="border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:7px;padding:7px 9px;font:13px var(--font)">'
+      + '<option value="">— não usar —</option>'
+      + upCols.map(function(col){ return '<option value="'+col+'"'+(col===guess?' selected':'')+'>'+col+'</option>'; }).join("")
+      + '</select></label>';
+  }).join("");
+  box.classList.remove("hide");
+  el("upEnviar").classList.remove("hide");
+  el("upHint").textContent = "Confira o mapa (campos com * são obrigatórios) e clique Importar.";
+}
+async function jform(path, formData){
+  var h = {"Authorization":"Bearer "+TOKEN};
+  var emp = el("empresa");
+  if(!emp.classList.contains("hide") && emp.value) h["X-Tenant-Id"] = emp.value;
+  var r = await fetch(API+path, {method:"POST", headers:h, body:formData});
+  if(!r.ok){ var t = await r.json().catch(function(){return {detail:"HTTP "+r.status};});
+    throw new Error(t.detail || ("HTTP "+r.status)); }
+  return r.json();
 }
 
 var ACAO_ST = {planejada:"Planejada", em_andamento:"Em andamento", concluida:"Concluída", cancelada:"Cancelada"};
@@ -1182,6 +1282,74 @@ el("radarSalvar").addEventListener("click", async function(){
     el("radarSalvar").textContent = "Salvo ✓";
     setTimeout(function(){ el("radarSalvar").textContent = "Salvar notas"; }, 1500);
   }catch(e){ window.alert("Não foi possível salvar: "+e.message); }
+});
+el("ferAdd").addEventListener("click", function(){
+  if(!el("ferData").value || !el("ferNome").value.trim()){
+    window.alert("Informe a data e o nome."); return;
+  }
+  jsend("POST","/feriados",{data:el("ferData").value, nome:el("ferNome").value.trim(), tipo:el("ferTipo").value})
+    .then(function(){ el("ferNome").value=""; refreshFeriados(); })
+    .catch(function(e){ window.alert(e.message); });
+});
+el("ferLista").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-fer]"); if(!b) return;
+  jsend("DELETE","/feriados/"+b.getAttribute("data-fer")).then(refreshFeriados)
+    .catch(function(err){ window.alert(err.message); });
+});
+el("upArquivo").addEventListener("change", function(){
+  var f = el("upArquivo").files[0]; if(!f) return;
+  var rd = new FileReader();
+  rd.onload = function(){
+    var head = String(rd.result).split(/\r?\n/)[0] || "";
+    var delim = (head.split(";").length >= head.split(",").length) ? ";" : ",";
+    upCols = head.split(delim).map(function(c){ return c.trim().replace(/^"|"$/g,""); }).filter(Boolean);
+    if(upCols.length < 2){ el("upHint").textContent = "Não consegui ler o cabeçalho — o arquivo tem uma linha de títulos?"; return; }
+    upMontarMapa();
+  };
+  rd.readAsText(f.slice(0, 65536));
+});
+el("upEnviar").addEventListener("click", async function(){
+  var f = el("upArquivo").files[0];
+  if(!f){ window.alert("Escolha o arquivo."); return; }
+  if(!el("upLojaCod").value.trim()){ window.alert("Informe o código da loja."); return; }
+  var mapa = {};
+  Array.prototype.forEach.call(document.querySelectorAll('#upMapa select[data-campo]'), function(s){
+    if(s.value) mapa[s.getAttribute("data-campo")] = s.value;
+  });
+  var fd = new FormData();
+  fd.append("arquivo", f);
+  fd.append("loja_codigo", el("upLojaCod").value.trim());
+  fd.append("loja_nome", el("upLojaNome").value.trim());
+  fd.append("mapa", JSON.stringify(mapa));
+  el("upEnviar").disabled = true;
+  el("upHint").textContent = "Importando… (arquivos grandes podem levar alguns minutos)";
+  try{
+    var r = await jform("/dados/importar", fd);
+    el("upHint").textContent = "Importado: "+r.linhas.toLocaleString("pt-BR")+" linhas em "+r.dias+" dia(s). Recarregando o painel…";
+    load();
+  }catch(e){ el("upHint").textContent = "Erro: "+e.message; }
+  el("upEnviar").disabled = false;
+});
+el("perguntaBtn").addEventListener("click", async function(){
+  var q = el("perguntaInput").value.trim();
+  if(!q){ el("perguntaInput").focus(); return; }
+  el("perguntaResp").classList.remove("hide");
+  el("perguntaResp").textContent = "Analisando os dados…";
+  try{
+    var r = await jsend("POST","/advisor/pergunta",{pergunta:q});
+    el("perguntaResp").textContent = r.resposta;
+  }catch(e){ el("perguntaResp").textContent = "Erro: "+e.message; }
+});
+el("perguntaInput").addEventListener("keydown", function(e){ if(e.key==="Enter") el("perguntaBtn").click(); });
+el("btnResumoExec").addEventListener("click", async function(){
+  el("aiTexto").classList.remove("hide");
+  el("aiTexto").textContent = "Gerando resumo executivo…";
+  try{
+    var r = await jget("/advisor/resumo-executivo");
+    el("aiTexto").textContent = r.texto;
+    el("aiFonte").textContent = r.fonte==="ia" ? "✦ gerado por IA" : "✦ resumo numérico";
+    el("advisorFca").classList.add("hide");
+  }catch(e){ el("aiTexto").textContent = "Erro: "+e.message; }
 });
 el("acaoAdd").addEventListener("click", function(){ editorAcao(null, el("acaoAdd").closest("header")); });
 el("acoesTbl").addEventListener("click", function(e){

@@ -150,6 +150,22 @@ def main():
     st, _ = req("DELETE", "/acoes/" + a.get("id", "x"), token=tok)
     check("acoes DELETE", st == 200)
 
+    # 2.2/2.3 IA (fallback quando sem chave) + 3.4 feriados
+    st, pg = req("POST", "/advisor/pergunta", token=tok, body={"pergunta": "Qual loja mais caiu?"})
+    check("advisor/pergunta 200 (ia|indisponivel)", st == 200 and pg.get("fonte") in ("ia", "indisponivel"),
+          "fonte=" + str(pg.get("fonte")))
+    st, rx = req("GET", "/advisor/resumo-executivo", token=tok)
+    check("resumo-executivo 200 com texto", st == 200 and bool(rx.get("texto")),
+          "fonte=" + str(rx.get("fonte")))
+    st, fer = req("POST", "/feriados", token=tok,
+                  body={"data": "2026-12-25", "nome": "Natal TESTE", "tipo": "feriado"})
+    check("feriado POST", st == 200 and fer.get("id"))
+    st, fl = req("GET", "/feriados", token=tok)
+    check("feriado GET", st == 200 and any(f["nome"] == "Natal TESTE" for f in fl.get("feriados", [])))
+    if fer.get("id"):
+        st, _ = req("DELETE", "/feriados/" + fer["id"], token=tok)
+        check("feriado DELETE", st == 200)
+
     # 4.2 painel super-admin
     st, mm = req("GET", "/admin/metricas", token=atok)
     check("admin/metricas 200", st == 200 and mm.get("totais", {}).get("tenants", 0) >= 3,

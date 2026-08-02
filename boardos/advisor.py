@@ -78,6 +78,58 @@ def gerar_insight(contexto: Dict, cache_key: Optional[str] = None) -> Optional[s
         return None  # qualquer falha => fallback estatístico silencioso
 
 
+def _chamada(system: str, user_text: str, max_tokens: int = 1200) -> Optional[str]:
+    """Chamada padrão ao modelo com fallback silencioso (None)."""
+    if not disponivel():
+        return None
+    try:
+        client = anthropic.Anthropic()
+        resp = client.messages.create(
+            model=MODEL, max_tokens=max_tokens,
+            output_config={"effort": "low"},
+            system=system,
+            messages=[{"role": "user", "content": user_text}],
+        )
+        if resp.stop_reason == "refusal":
+            return None
+        texto = "".join(b.text for b in resp.content if b.type == "text").strip()
+        return texto or None
+    except Exception:
+        return None
+
+
+SYSTEM_PERGUNTA = SYSTEM + """
+
+O CEO vai fazer UMA pergunta sobre os dados. Responda só com base no JSON
+fornecido; se o dado necessário não estiver lá, diga isso claramente e sugira
+onde olhar. Resposta direta, máx. ~120 palavras."""
+
+
+def responder_pergunta(contexto: Dict, pergunta: str) -> Optional[str]:
+    """2.2 — Converse com seus dados. None => IA indisponível."""
+    return _chamada(
+        SYSTEM_PERGUNTA,
+        ("Dados reais do supermercado (JSON):\n"
+         + json.dumps(contexto, ensure_ascii=False, default=str)
+         + f"\n\nPergunta do CEO: {pergunta}"))
+
+
+SYSTEM_RESUMO_EXEC = SYSTEM + """
+
+Gere o RESUMO EXECUTIVO do período para o board: 1 parágrafo de leitura geral,
+depois blocos curtos "Destaques:", "Riscos:" e "Prioridades da semana:" (até 3
+bullets cada, iniciados por "- "). Texto puro, máx. ~200 palavras."""
+
+
+def resumo_executivo(contexto: Dict) -> Optional[str]:
+    """2.3 — Briefing do board. None => IA indisponível."""
+    return _chamada(
+        SYSTEM_RESUMO_EXEC,
+        ("Dados reais do supermercado (JSON):\n"
+         + json.dumps(contexto, ensure_ascii=False, default=str)
+         + "\n\nGere o resumo executivo."), max_tokens=1500)
+
+
 SYSTEM_DESCOBERTA = """Você é o BoardOS Advisor. Um CEO de supermercado respondeu
 à Entrevista de Descoberta. Gere o documento final em português do Brasil, claro
 e direto, texto puro (títulos em MAIÚSCULAS, sem markdown), nesta estrutura:

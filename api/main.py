@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from typing import Dict, Optional  # noqa: E402
 
-from fastapi import Depends, FastAPI, Header, HTTPException  # noqa: E402
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -756,6 +756,65 @@ def acoes_delete(aid: str, user: dict = Depends(current), tid: str = Depends(ten
     return {"ok": True}
 
 
+# ------------------------------------- 4.4 upload de dados (self-service)
+@app.post("/dados/importar")
+async def dados_importar(
+    arquivo: UploadFile = File(...),
+    loja_codigo: str = Form(...),
+    loja_nome: str = Form(""),
+    mapa: str = Form(...),
+    user: dict = Depends(current),
+    tid: str = Depends(tenant_of),
+):
+    """Importa um CSV de vendas (grão cupom/item) pelo painel.
+
+    `mapa` = JSON {campo_canonico: coluna_do_arquivo}. Pipeline idempotente:
+    reenviar o mesmo arquivo substitui, não duplica. Atualiza o gold e o
+    medidor de uso (billing).
+    """
+    import json as _json
+    import os as _os
+    import tempfile
+
+    from boardos.ingestion import ingest_csv
+    from boardos.mapping import ColumnMap
+
+    _can_edit(user)
+    if not loja_codigo.strip():
+        raise HTTPException(400, "Informe o código da loja.")
+    try:
+        cmap = ColumnMap({k: v for k, v in _json.loads(mapa).items() if v})
+    except Exception:
+        raise HTTPException(400, "Mapa de colunas inválido.")
+    faltam = cmap.missing_required()
+    if faltam:
+        raise HTTPException(400, f"Mapeie as colunas obrigatórias: {', '.join(faltam)}.")
+    conteudo = await arquivo.read()
+    if len(conteudo) > 25_000_000:
+        raise HTTPException(413, "Arquivo acima de 25 MB — divida em partes.")
+    if not conteudo.strip():
+        raise HTTPException(400, "Arquivo vazio.")
+    tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
+    try:
+        tmp.write(conteudo)
+        tmp.close()
+        try:
+            res = ingest_csv(
+                tenant_id=tid,
+                loja_codigo=loja_codigo.strip(),
+                loja_nome=loja_nome.strip() or ("Loja " + loja_codigo.strip()),
+                csv_path=tmp.name,
+                cmap=cmap,
+            )
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        except Exception:
+            raise HTTPException(400, "Não foi possível processar o arquivo — confira o formato e o mapa de colunas.")
+    finally:
+        _os.unlink(tmp.name)
+    return {"ok": True, "linhas": res["linhas"], "dias": res["dias"]}
+
+
 # ------------------------------------------------- gestão de usuários
 class UsuarioIn(BaseModel):
     email: str
@@ -866,19 +925,14 @@ def trocar_senha(body: TrocaSenhaIn, user: dict = Depends(current)):
 
 
 # ---------------------------------------------------- Advisor com IA
-@app.get("/advisor/insight")
-def advisor_insight(tid: str = Depends(tenant_of)):
-    """Leitura executiva do último mês gerada por IA (Claude), com fallback.
-
-    fonte="ia": texto narrativo gerado sobre os números reais do tenant.
-    fonte="motor": sem chave/erro — o painel usa o Fato/Causa/Ação estatístico.
-    """
+def _contexto_tenant(tid: str):
+    """Contexto numérico do tenant para a IA: YoY, lojas, metas, FCA e feriados."""
     with tenant_session(tid) as cur:
         cur.execute("SELECT max(data) FROM gold_venda_diaria")
         row = cur.fetchone()
         ult = row[0] if row else None
         if not ult:
-            return {"fonte": "motor"}
+            return None, None
         yoy = _yoy_do_ultimo_mes(cur)
         lojas = _lojas_mes(cur, ult.year, ult.month)
         cur.execute(
@@ -893,9 +947,16 @@ def advisor_insight(tid: str = Depends(tenant_of)):
             prog, farol = _kr_progresso(meta, a, base, direcao)
             metas.append({"objetivo": ot, "kr": kt, "meta": float(meta),
                           "atual": a, "progresso": prog, "farol": farol})
+        cur.execute("SELECT titulo, status, causa, acao, responsavel FROM fca_ciclo "
+                    "WHERE status IN ('aberto','em_andamento') ORDER BY criado_em DESC LIMIT 10")
+        fcas = [{"titulo": r[0], "status": r[1], "causa": r[2], "acao": r[3],
+                 "responsavel": r[4]} for r in cur.fetchall()]
+        cur.execute("SELECT data, nome, tipo FROM feriado "
+                    "WHERE data BETWEEN now()::date AND now()::date + 45 ORDER BY data LIMIT 10")
+        feriados = [{"data": str(r[0]), "nome": r[1], "tipo": r[2]} for r in cur.fetchall()]
 
     if not yoy:
-        return {"fonte": "motor"}
+        return None, ult
     contexto = {
         "mes_referencia": f"{ult.year}-{ult.month:02d}",
         "comparacao_yoy": {
@@ -911,11 +972,109 @@ def advisor_insight(tid: str = Depends(tenant_of)):
                    "var_varejo_pct": round(l["var_ajustada"] * 100, 1) if l["var_ajustada"] is not None else None}
                   for l in lojas],
         "metas": metas,
+        "planos_de_acao_abertos": fcas,
+        "proximos_feriados_e_datas": feriados,
     }
+    return contexto, ult
+
+
+@app.get("/advisor/insight")
+def advisor_insight(tid: str = Depends(tenant_of)):
+    """Leitura executiva do último mês gerada por IA (Claude), com fallback."""
+    contexto, ult = _contexto_tenant(tid)
+    if not contexto:
+        return {"fonte": "motor"}
     texto = advisor.gerar_insight(contexto, cache_key=f"{tid}:{ult.isoformat()}")
     if texto:
         return {"fonte": "ia", "texto": texto}
     return {"fonte": "motor"}
+
+
+class PerguntaIn(BaseModel):
+    pergunta: str
+
+
+@app.post("/advisor/pergunta")
+def advisor_pergunta(body: PerguntaIn, tid: str = Depends(tenant_of)):
+    """2.2 — Converse com seus dados: pergunta livre respondida sobre os números."""
+    if not body.pergunta.strip():
+        raise HTTPException(400, "Escreva a pergunta.")
+    contexto, _ = _contexto_tenant(tid)
+    if not contexto:
+        return {"fonte": "indisponivel",
+                "resposta": "Ainda não há dados suficientes para responder."}
+    texto = advisor.responder_pergunta(contexto, body.pergunta.strip())
+    if texto:
+        return {"fonte": "ia", "resposta": texto}
+    return {"fonte": "indisponivel",
+            "resposta": "A IA do Advisor ainda não está ativa (configure a ANTHROPIC_API_KEY no servidor)."}
+
+
+@app.get("/advisor/resumo-executivo")
+def advisor_resumo_exec(tid: str = Depends(tenant_of)):
+    """2.3 — Briefing do board gerado pela IA, com fallback numérico."""
+    contexto, _ = _contexto_tenant(tid)
+    if not contexto:
+        return {"fonte": "motor", "texto": "Sem dados suficientes para o resumo."}
+    texto = advisor.resumo_executivo(contexto)
+    if texto:
+        return {"fonte": "ia", "texto": texto}
+    c = contexto["comparacao_yoy"]
+    metas_r = [m for m in contexto["metas"] if m["farol"] == "r"]
+    fallback = (
+        f"RESUMO {contexto['mes_referencia']}\n"
+        f"Faturamento {c['faturamento_total']:,.0f} — civil {c['var_civil_pct']:+.1f}% / "
+        f"varejo (ajustado) {c['var_varejo_ajustada_pct']:+.1f}% vs. ano anterior "
+        f"(efeito calendário {c['efeito_calendario_pp']:+.1f}pp).\n"
+        f"Metas fora da rota: {len(metas_r)}"
+        + (" — " + "; ".join(m["kr"] for m in metas_r[:3]) if metas_r else "")
+        + f".\nPlanos de ação abertos: {len(contexto['planos_de_acao_abertos'])}."
+    )
+    return {"fonte": "motor", "texto": fallback}
+
+
+# ------------------------------------------------- feriados (3.4)
+class FeriadoIn(BaseModel):
+    data: str
+    nome: str
+    tipo: str = "feriado"
+
+
+@app.get("/feriados")
+def feriados_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT id, data, nome, tipo FROM feriado ORDER BY data")
+        rows = [{"id": str(r[0]), "data": str(r[1]), "nome": r[2], "tipo": r[3]}
+                for r in cur.fetchall()]
+    return {"feriados": rows}
+
+
+@app.post("/feriados")
+def feriados_post(body: FeriadoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if body.tipo not in ("feriado", "sazonal"):
+        raise HTTPException(400, "Tipo inválido.")
+    if not body.nome.strip():
+        raise HTTPException(400, "Dê um nome à data.")
+    with tenant_session(tid) as cur:
+        try:
+            cur.execute("INSERT INTO feriado (tenant_id, data, nome, tipo) "
+                        "VALUES (%s,%s,%s,%s) RETURNING id",
+                        (tid, body.data, body.nome.strip(), body.tipo))
+            fid = cur.fetchone()[0]
+        except Exception:
+            raise HTTPException(409, "Essa data/nome já está cadastrada.")
+    return {"id": str(fid)}
+
+
+@app.delete("/feriados/{fid}")
+def feriados_delete(fid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM feriado WHERE id=%s", (fid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Data não encontrada.")
+    return {"ok": True}
 
 
 # -------------------------------------------- forecast + categorias

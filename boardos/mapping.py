@@ -12,7 +12,7 @@ from typing import Dict, Optional
 # Campos canônicos do item de venda e se são obrigatórios.
 CANONICAL_FIELDS = {
     "data": True,
-    "loja_codigo": True,
+    "loja_codigo": False,   # opcional: o upload pelo painel fixa a loja no formulário
     "cupom_id": True,
     "seq_item": False,       # se ausente, derivamos pela ordem no cupom
     "sku_codigo": True,
@@ -63,7 +63,7 @@ def normalize_row(raw: Dict[str, str], cmap: ColumnMap, seq_fallback: int) -> Di
     seq = g("seq_item")
     return {
         "data": _parse_date(g("data")),
-        "loja_codigo": str(g("loja_codigo")).strip(),
+        "loja_codigo": (str(g("loja_codigo")).strip() if g("loja_codigo") else ""),
         "cupom_id": str(g("cupom_id")).strip(),
         "seq_item": int(seq) if seq not in (None, "") else seq_fallback,
         "sku_codigo": str(g("sku_codigo")).strip(),
