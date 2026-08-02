@@ -447,6 +447,20 @@
     </section>
 
     <section class="card">
+      <header><h2>Últimos 13 meses & próximos 3</h2><span class="sub" id="mensalSub"></span></header>
+      <div class="body">
+        <svg class="chart" id="mensalChart" viewBox="0 0 720 240" preserveAspectRatio="none"></svg>
+        <div class="legend" style="margin-top:10px">
+          <span><i style="display:inline-block;width:12px;height:12px;background:var(--accent);border-radius:3px;vertical-align:-2px"></i> Fechado</span>
+          <span><i style="display:inline-block;width:12px;height:12px;background:var(--accent);opacity:.45;border-radius:3px;vertical-align:-2px"></i> Projeção do corrente</span>
+          <span><i style="display:inline-block;width:12px;height:12px;border:2px dashed var(--accent);border-radius:3px;vertical-align:-2px;box-sizing:border-box"></i> Próximos meses</span>
+          <span><i style="display:inline-block;width:14px;height:0;border-top:3px solid var(--warn);vertical-align:3px"></i> Programado (meta)</span>
+        </div>
+        <div class="hint" id="mensalNota" style="margin-top:6px"></div>
+      </div>
+    </section>
+
+    <section class="card">
       <header><h2>Lojas</h2><span class="sub">drill-down do mês</span></header>
       <div class="body" style="overflow-x:auto">
         <table class="tbl" id="lojasTbl">
@@ -566,6 +580,8 @@ async function load(){
     render();
     try{ var cr = await jget("/categorias/resumo?ano="+ano+"&mes="+mes); renderCats(cr.categorias); }
     catch(_){ renderCats([]); }
+    try{ var km = await jget("/kpi/mensal"); renderMensal(km); }
+    catch(_){ renderMensal(null); }
     try{ var ok = await jget("/okrs"); renderOkrs(ok.objetivos); }
     catch(_){ el("okrs").innerHTML='<span class="hint">Sem metas cadastradas.</span>'; }
     try{ var lr = await jget("/lojas/resumo?ano="+ano+"&mes="+mes); renderLojas(lr.lojas); }
@@ -1252,6 +1268,71 @@ function renderLojas(lojas){
 }
 
 var okrCache = [];
+function renderMensal(km){
+  var svg = el("mensalChart");
+  while(svg.firstChild) svg.removeChild(svg.firstChild);
+  if(!km || !km.meses || !km.meses.length){
+    el("mensalSub").textContent = ""; el("mensalNota").textContent = "Sem histórico suficiente ainda."; return;
+  }
+  var ns = "http://www.w3.org/2000/svg";
+  function mk(t,a){ var e=document.createElementNS(ns,t); for(var k in a) e.setAttribute(k,a[k]); return e; }
+  var cs = getComputedStyle(document.body);
+  var Cac = cs.getPropertyValue("--accent").trim(), Cwarn = cs.getPropertyValue("--warn").trim(),
+      Cgr = cs.getPropertyValue("--grid").trim(), Cmu = cs.getPropertyValue("--muted").trim();
+  var ms = km.meses;
+  var vals = ms.map(function(m){
+    return m.tipo==="fechado" ? m.realizado : (m.tipo==="corrente" ? m.projetado : m.previsto);
+  });
+  var metas = ms.map(function(m){ return m.meta; });
+  var max = Math.max.apply(null, vals.concat(metas.filter(function(v){return v!=null;}), [1])) * 1.12;
+  var W=720, H=240, P={l:8,r:8,t:10,b:26};
+  var iw = W-P.l-P.r, ih = H-P.t-P.b;
+  var n = ms.length, bw = iw/n*0.62, step = iw/n;
+  function Y(v){ return P.t + ih - (v/max)*ih; }
+  for(var g=1; g<=3; g++){
+    var gy = P.t + ih*g/4;
+    svg.appendChild(mk("line",{x1:P.l,y1:gy,x2:W-P.r,y2:gy,stroke:Cgr,"stroke-width":1}));
+  }
+  var MESN = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  ms.forEach(function(m, i){
+    var x = P.l + step*i + (step-bw)/2;
+    var titulo = m.mes + " — " + (m.tipo==="corrente"
+      ? "realizado "+brl(m.realizado)+" + projeção "+brl(m.previsto_restante)+" = "+brl(m.projetado)
+      : (m.tipo==="previsto" ? "previsto "+brl(m.previsto) : "realizado "+brl(m.realizado)))
+      + (m.meta!=null ? " · programado "+brl(m.meta) : "");
+    var grupo = mk("g",{});
+    var tEl = mk("title",{}); tEl.textContent = titulo; grupo.appendChild(tEl);
+    if(m.tipo==="fechado"){
+      grupo.appendChild(mk("rect",{x:x,y:Y(m.realizado),width:bw,height:Math.max(1,P.t+ih-Y(m.realizado)),fill:Cac,rx:3}));
+    } else if(m.tipo==="corrente"){
+      grupo.appendChild(mk("rect",{x:x,y:Y(m.realizado),width:bw,height:Math.max(1,P.t+ih-Y(m.realizado)),fill:Cac,rx:3}));
+      if(m.previsto_restante>0){
+        grupo.appendChild(mk("rect",{x:x,y:Y(m.projetado),width:bw,
+          height:Math.max(1,Y(m.realizado)-Y(m.projetado)),fill:Cac,opacity:.45,rx:3}));
+      }
+    } else {
+      grupo.appendChild(mk("rect",{x:x,y:Y(m.previsto),width:bw,height:Math.max(1,P.t+ih-Y(m.previsto)),
+        fill:"none",stroke:Cac,"stroke-width":2,"stroke-dasharray":"4 3",rx:3,opacity:.8}));
+    }
+    if(m.meta!=null){
+      grupo.appendChild(mk("line",{x1:x-2,y1:Y(m.meta),x2:x+bw+2,y2:Y(m.meta),
+        stroke:Cwarn,"stroke-width":3,"stroke-linecap":"round"}));
+    }
+    svg.appendChild(grupo);
+    var lb = mk("text",{x:x+bw/2,y:H-10,"text-anchor":"middle",fill:Cmu,"font-size":8.5});
+    lb.textContent = MESN[+m.mes.slice(5,7)-1]+"/"+m.mes.slice(2,4);
+    svg.appendChild(lb);
+  });
+  var corrente = ms.filter(function(m){return m.tipo==="corrente";})[0];
+  el("mensalSub").textContent = "até " + (km.ancora||"");
+  el("mensalNota").textContent = corrente
+    ? ("Mês corrente ("+corrente.mes+"): realizado "+brl(corrente.realizado)+
+       (corrente.previsto_restante>0 ? " + projeção "+brl(corrente.previsto_restante)+" → tendência "+brl(corrente.projetado) : "")+
+       (corrente.meta!=null ? " · programado "+brl(corrente.meta) : "")+
+       ". A projeção se corrige a cada dia de venda.")
+    : "";
+}
+
 function renderCats(cats){
   var tb = el("catsTbl").querySelector("tbody");
   if(!cats || !cats.length){

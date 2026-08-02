@@ -127,6 +127,12 @@ def ingest_csv(
                 dias_afetados.add(r["data"])
                 linhas += 1
 
+        # garante a dim_calendario para o período do arquivo (JOINs de KPI)
+        if dias_afetados:
+            from .calendar_gen import upsert_into as _cal
+            _cal(cur, min(dias_afetados).replace(month=1, day=1),
+                 max(dias_afetados).replace(month=12, day=31))
+
         # recompute incremental do gold só nos dias afetados
         for d in sorted(dias_afetados):
             cur.execute("SELECT recompute_gold(%s,%s,%s)", (tenant_id, loja_id, d))

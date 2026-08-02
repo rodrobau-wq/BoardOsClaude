@@ -980,6 +980,13 @@ def dados_importar_diario(body: ImportDiarioIn, user: dict = Depends(current),
                             "cupons": int(li.cupons), "itens": int(li.itens)})
         except Exception:
             raise HTTPException(400, f"Linha {i+1} inválida (esperado data ISO, loja_codigo, faturamento).")
+    # garante a dim_calendario (calendário duplo) para o período importado —
+    # sem isso o JOIN do KPI descarta datas fora do range semeado
+    from boardos.calendar_gen import upsert_into as _cal
+    dmin = min(r["data"] for r in records)
+    dmax = max(r["data"] for r in records)
+    with tenant_session(tid) as cur:
+        _cal(cur, dmin.replace(month=1, day=1), dmax.replace(month=12, day=31))
     from boardos.crm import import_vendas_diarias_rows
     res = import_vendas_diarias_rows(tid, records, margem_sintetica=False)
     return {"ok": True, "linhas": res["linhas"]}
@@ -1348,6 +1355,78 @@ def feriados_delete(fid: str, user: dict = Depends(current), tid: str = Depends(
         if cur.rowcount == 0:
             raise HTTPException(404, "Data não encontrada.")
     return {"ok": True}
+
+
+def _add_meses(ano: int, mes: int, delta: int):
+    t = ano * 12 + (mes - 1) + delta
+    return t // 12, t % 12 + 1
+
+
+@app.get("/kpi/mensal")
+def kpi_mensal(tid: str = Depends(tenant_of)):
+    """Visão de 13 meses + tendência: 12 meses fechados, o mês corrente
+    (realizado + projeção do restante, recalculada a cada dia) e os próximos
+    3 meses projetados. "Programado" = faturamento do mesmo mês do ano
+    anterior × meta anual do KR de faturamento (quando existirem).
+    """
+    import calendar as _cal2
+    from datetime import date as _date, timedelta as _td
+
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT max(data) FROM gold_venda_diaria")
+        row = cur.fetchone()
+        ult = row[0] if row else None
+        if not ult:
+            return {"meses": [], "ancora": None}
+        ancora = min(_date.today(), ult)
+        a0, m0 = ancora.year, ancora.month
+        # histórico diário: 25 meses p/ trás (cobre ano-anterior dos 13+3 meses)
+        ia, im = _add_meses(a0, m0, -25)
+        cur.execute(
+            "SELECT data, sum(faturamento_liq) FROM gold_venda_diaria "
+            "WHERE categoria_id IS NULL AND data BETWEEN %s AND %s "
+            "GROUP BY data ORDER BY data",
+            (_date(ia, im, 1), ancora))
+        hist = [{"data": r[0], "faturamento_liq": float(r[1])} for r in cur.fetchall()]
+        cur.execute("SELECT meta FROM okr_kr WHERE fonte='fat_yoy_pct' LIMIT 1")
+        r = cur.fetchone()
+        meta_pct = float(r[0]) if r else None
+
+    por_mes: dict = {}
+    for h in hist:
+        k = (h["data"].year, h["data"].month)
+        por_mes[k] = por_mes.get(k, 0.0) + h["faturamento_liq"]
+
+    def _meta(ano: int, mes: int):
+        if meta_pct is None:
+            return None
+        base = por_mes.get((ano - 1, mes))
+        return round(base * (1 + meta_pct / 100), 2) if base else None
+
+    meses = []
+    # 12 meses fechados antes do corrente
+    for d in range(-12, 0):
+        ay, am = _add_meses(a0, m0, d)
+        meses.append({"mes": f"{ay}-{am:02d}", "tipo": "fechado",
+                      "realizado": round(por_mes.get((ay, am), 0.0), 2),
+                      "meta": _meta(ay, am)})
+    # mês corrente: realizado até a âncora + projeção do restante
+    fcm = fc.forecast_mes(hist, a0, m0, cutoff=ancora)
+    meses.append({"mes": f"{a0}-{m0:02d}", "tipo": "corrente",
+                  "realizado": fcm["total_realizado"],
+                  "previsto_restante": fcm["total_previsto"],
+                  "projetado": fcm["total_projetado"],
+                  "meta": _meta(a0, m0)})
+    # próximos 3 meses: média por dia-da-semana das últimas 8 semanas
+    base56 = [h for h in hist if h["data"] >= ancora - _td(days=56)]
+    for d in range(1, 4):
+        ay, am = _add_meses(a0, m0, d)
+        dias = fc.prever_dias(base56, _date(ay, am, 1),
+                              _date(ay, am, _cal2.monthrange(ay, am)[1]))
+        meses.append({"mes": f"{ay}-{am:02d}", "tipo": "previsto",
+                      "previsto": round(sum(x["valor"] for x in dias), 2),
+                      "meta": _meta(ay, am)})
+    return {"meses": meses, "ancora": str(ancora)}
 
 
 # -------------------------------------------- forecast + categorias
