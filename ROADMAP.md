@@ -24,6 +24,8 @@
 | Onboarding | **Upload de CSV pela tela** com mapeador de colunas e sugestão automática (4.4 ✅) |
 | IA (completa) | **Converse com seus dados** (2.2 ✅) e **Resumo executivo do board** (2.3 ✅) — com fallback sem chave |
 | Calendário | **Feriados e datas sazonais** por rede, alimentando o Advisor (3.4 ✅) |
+| Storytelling | **Navegação narrativa**: Hoje / Conselho / Estratégia (4 passos) / Execução / Configurações + checklist "Comece por aqui" ✅ |
+| Conselho | **Conselho BoardOS**: 5 conselheiros (Estratégia, Categorias, Trade & Indústria/JBP, Clientes/CRM, Novas Receitas/Retail Media) com pauta calculada dos dados reais + chat por persona ✅ |
 | Comercial | **Site de produto** no ar — boardos-site.onrender.com (4.5 ✅) |
 | Deploy | Render (API + painel + Postgres pago), GitHub CI por push |
 | CRM | Conector com layout assumido + onboarding demo (aguarda amostra real) |
