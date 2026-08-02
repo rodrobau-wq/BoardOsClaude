@@ -24,11 +24,16 @@ from boardos import advisor, comparison  # noqa: E402
 from boardos.auth import decode_token, hash_password, make_token, verify_password  # noqa: E402
 from boardos.db import platform_session, tenant_session  # noqa: E402
 
-app = FastAPI(title="BoardOS API", version="0.3.0-auth")
+app = FastAPI(title="BoardOS API", version="0.4.0")
 
+# CORS restrito aos domínios do painel (override por env p/ novos domínios)
+_ORIGENS = os.environ.get(
+    "BOARDOS_CORS_ORIGINS",
+    "https://boardos-painel.onrender.com,http://localhost:3000,http://localhost:8000,http://127.0.0.1:8000",
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],           # restringir aos domínios do painel em produção
+    allow_origins=[o.strip() for o in _ORIGENS if o.strip()],
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["*"],
 )
@@ -72,8 +77,29 @@ class LoginIn(BaseModel):
     senha: str
 
 
+# Rate-limit simples do login (in-memory): 5 falhas por e-mail em 60s => 429.
+_LOGIN_FAILS: dict = {}
+_LOGIN_MAX, _LOGIN_JANELA = 5, 60.0
+
+
+def _login_bloqueado(email: str) -> bool:
+    import time as _t
+    agora = _t.time()
+    falhas = [t for t in _LOGIN_FAILS.get(email, []) if agora - t < _LOGIN_JANELA]
+    _LOGIN_FAILS[email] = falhas
+    return len(falhas) >= _LOGIN_MAX
+
+
+def _login_falhou(email: str) -> None:
+    import time as _t
+    _LOGIN_FAILS.setdefault(email, []).append(_t.time())
+
+
 @app.post("/auth/login")
 def login(body: LoginIn):
+    email_norm = body.email.strip().lower()
+    if _login_bloqueado(email_norm):
+        raise HTTPException(429, "Muitas tentativas. Aguarde um minuto e tente de novo.")
     with platform_session() as cur:
         cur.execute(
             "SELECT email, senha_hash, nome, tenant_id, papel "
@@ -82,6 +108,7 @@ def login(body: LoginIn):
         )
         row = cur.fetchone()
     if not row or not verify_password(body.senha, row[1]):
+        _login_falhou(email_norm)
         raise HTTPException(401, "E-mail ou senha inválidos.")
     tenant_id = str(row[3]) if row[3] else ""   # super_admin não tem tenant fixo
     tenant = None
