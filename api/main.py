@@ -69,21 +69,30 @@ def kpi_diario(
     comparação. RLS garante que só o tenant do header é visível.
     """
     with tenant_session(x_tenant_id) as cur:
+        # soma por DIA (total da rede) — agrega as lojas, consistente com /comparacao
         cur.execute(
             """
-            SELECT data, ano_civil, mes_civil, dow_label, is_fim_semana,
-                   retail_year, retail_week, qtd_mesmo_dow_no_mes,
-                   faturamento_liq, cupons, itens,
-                   ticket_medio, itens_por_cupom, margem_pct
+            SELECT data,
+                   sum(faturamento_liq)          AS faturamento_liq,
+                   sum(cupons)                   AS cupons,
+                   sum(itens)                    AS itens,
+                   max(dow_label)                AS dow_label,
+                   bool_or(is_fim_semana)        AS is_fim_semana,
+                   max(retail_year)              AS retail_year,
+                   max(retail_week)              AS retail_week
               FROM v_kpi_diario
              WHERE categoria_id IS NULL
                AND data BETWEEN %s AND %s
+             GROUP BY data
              ORDER BY data
             """,
             (data_de, data_ate),
         )
         cols = [d.name for d in cur.description]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+        for r in rows:  # tipos JSON-friendly
+            r["data"] = str(r["data"])
+            r["faturamento_liq"] = float(r["faturamento_liq"])
     if not rows:
         raise HTTPException(404, "Sem dados no período para este tenant.")
     return {"periodo": [data_de, data_ate], "dias": rows}

@@ -125,7 +125,10 @@
       <header><h2>Vendas diárias</h2>
         <div class="legend"><span class="lg-a"><i></i>Atual</span><span class="lg-p"><i></i>Ano anterior</span></div>
       </header>
-      <div class="body"><svg class="chart" id="chart" viewBox="0 0 720 260" preserveAspectRatio="none"></svg></div>
+      <div class="body">
+        <svg class="chart" id="chart" viewBox="0 0 720 260" preserveAspectRatio="none"></svg>
+        <div id="chartNote" style="color:var(--faint);font-size:11.5px;margin-top:8px"></div>
+      </div>
     </section>
 
     <section class="card">
@@ -231,6 +234,22 @@ function render(){
   drawChart();
 }
 
+// série do ano anterior conforme a lente: civil (mesma data) ou varejo (semana alinhada).
+function priorSeries(){
+  var A=last.atual, B=last.base;
+  if(lens==="civil"){
+    el("chartNote").innerHTML="Ano anterior alinhado por <b>data do calendário</b> (civil).";
+    return B.map(function(r){return +r.faturamento_liq;});
+  }
+  el("chartNote").innerHTML="Ano anterior alinhado por <b>semana de varejo</b> — os dias da semana casam com o ano atual.";
+  function rel(arr){var mn=Math.min.apply(null,arr.map(function(r){return +r.retail_week;}));
+    return function(r){return (+r.retail_week)-mn;};}
+  var relB=rel(B), map={};
+  B.forEach(function(r){map[relB(r)+"|"+r.dow_label]=+r.faturamento_liq;});
+  var relA=rel(A);
+  return A.map(function(r){var k=relA(r)+"|"+r.dow_label; return map[k]!=null?map[k]:null;});
+}
+
 function drawChart(){
   var svg=el("chart"); while(svg.firstChild)svg.removeChild(svg.firstChild);
   var ns="http://www.w3.org/2000/svg";
@@ -239,15 +258,15 @@ function drawChart(){
   var Cac=cs.getPropertyValue("--accent").trim(), Cpr=cs.getPropertyValue("--prioryr").trim(),
       Cgr=cs.getPropertyValue("--grid").trim(), Cmu=cs.getPropertyValue("--muted").trim();
   var A=last.atual.map(function(r){return +r.faturamento_liq;});
-  var B=last.base.map(function(r){return +r.faturamento_liq;});
-  var n=Math.max(A.length,B.length); if(!n)return;
-  var all=A.concat(B), max=Math.max.apply(null,all)*1.08;
+  var B=priorSeries();
+  var n=A.length; if(!n)return;
+  var all=A.concat(B.filter(function(v){return v!=null;})), max=Math.max.apply(null,all)*1.08;
   var P={l:46,r:12,t:12,b:22},W=720,H=260,iw=W-P.l-P.r,ih=H-P.t-P.b;
   function X(i){return P.l+(i/(n-1))*iw;} function Y(v){return P.t+ih-(v/max)*ih;}
   for(var s=0;s<=4;s++){var y=P.t+ih-(ih*s/4),val=max*s/4;
     svg.appendChild(mk("line",{x1:P.l,y1:y,x2:W-P.r,y2:y,stroke:Cgr,"stroke-width":1}));
     var tl=mk("text",{x:P.l-6,y:y+3,"text-anchor":"end",fill:Cmu,"font-size":9});tl.textContent=Math.round(val/1000);svg.appendChild(tl);}
-  function line(arr,opt){var d="",st=false;for(var i=0;i<arr.length;i++){d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(arr[i]).toFixed(1)+" ";st=true;}return mk("path",Object.assign({d:d,fill:"none"},opt));}
+  function line(arr,opt){var d="",st=false;for(var i=0;i<arr.length;i++){if(arr[i]==null){st=false;continue;}d+=(st?"L":"M")+X(i).toFixed(1)+" "+Y(arr[i]).toFixed(1)+" ";st=true;}return mk("path",Object.assign({d:d,fill:"none"},opt));}
   svg.appendChild(line(B,{stroke:Cpr,"stroke-width":2,"stroke-dasharray":"5 4","stroke-linecap":"round"}));
   svg.appendChild(line(A,{stroke:Cac,"stroke-width":3,"stroke-linecap":"round","stroke-linejoin":"round"}));
 }
