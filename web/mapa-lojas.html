@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BoardOS — Mapa das lojas</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<style>
+  html,body{margin:0;height:100%}
+  #map{height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .loja-pin{background:#2D5BE3;color:#fff;border:2px solid #fff;border-radius:50%;width:28px;height:28px;display:grid;place-items:center;font-weight:700;font-size:11px;box-shadow:0 1px 4px rgba(15,27,45,.35)}
+  .loja-pin.sel{background:#1E3F9E;width:32px;height:32px;font-size:12px}
+  .legenda{position:absolute;bottom:14px;left:14px;z-index:1000;background:#fff;border:1px solid #E4E9F3;border-radius:10px;padding:9px 12px;font-size:11.5px;color:#33425C;box-shadow:0 1px 2px rgba(15,27,45,.08);line-height:1.7}
+  .legenda i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  .aviso{position:absolute;inset:0;display:grid;place-items:center;z-index:1000;background:rgba(245,247,252,.92);
+    color:#5B6B85;font-size:13px;text-align:center;padding:20px}
+  .leaflet-popup-content{font-size:12.5px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="legenda">
+  <div><i style="background:rgba(45,91,227,.45)"></i>Área primária · 1,0 km</div>
+  <div><i style="background:rgba(45,91,227,.22)"></i>Área secundária · 2,0 km</div>
+  <div><i style="background:rgba(45,91,227,.10);border:1px dashed #2D5BE3"></i>Área terciária · 3,5 km</div>
+</div>
+<div class="aviso" id="aviso">Aguardando as lojas…<br><small>cadastre latitude/longitude em Minha Rede → Lojas para vê-las no mapa</small></div>
+<script>
+  // As lojas chegam do app via postMessage: {boardosLojas:[{id,nome,ini,lat,lng}]}
+  // Seleção bidirecional: app → {boardosLoja:id} · mapa → parent {boardosLoja:id}
+  var map = L.map('map', {scrollWheelZoom:false}).setView([-14.2, -51.9], 4);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap contributors' }).addTo(map);
+
+  var rings = L.layerGroup().addTo(map);
+  var markers = {}, LOJAS = {};
+
+  function setLojas(lojas){
+    Object.keys(markers).forEach(function(k){ map.removeLayer(markers[k]); });
+    markers = {}; LOJAS = {}; rings.clearLayers();
+    var comCoord = (lojas||[]).filter(function(l){ return l.lat!=null && l.lng!=null; });
+    document.getElementById('aviso').style.display = comCoord.length ? 'none' : 'grid';
+    if(!comCoord.length) return;
+    var bounds = [];
+    comCoord.forEach(function(l){
+      LOJAS[l.id] = l;
+      bounds.push([l.lat, l.lng]);
+      markers[l.id] = L.marker([l.lat, l.lng], {icon: L.divIcon({className:'',
+          html:'<div class="loja-pin" id="pin-'+l.id+'">'+(l.ini||'?')+'</div>', iconSize:[28,28], iconAnchor:[14,14]})})
+        .addTo(map).bindPopup('<b>'+l.nome+'</b><br>clique para ver as áreas P/S/T')
+        .on('click', function(){ select(l.id); parent.postMessage({boardosLoja:l.id}, '*'); });
+    });
+    if(bounds.length === 1) map.setView(bounds[0], 13);
+    else map.fitBounds(bounds, {padding:[40,40]});
+    select(comCoord[0].id);
+  }
+
+  function select(id){
+    var lj = LOJAS[id]; if(!lj) return;
+    rings.clearLayers();
+    L.circle([lj.lat, lj.lng], {radius:3500, color:'#2D5BE3', weight:1.4, dashArray:'6 5', fillColor:'#2D5BE3', fillOpacity:.06}).addTo(rings);
+    L.circle([lj.lat, lj.lng], {radius:2000, color:'#2D5BE3', weight:1.4, fillColor:'#2D5BE3', fillOpacity:.10}).addTo(rings);
+    L.circle([lj.lat, lj.lng], {radius:1000, color:'#1E3F9E', weight:1.6, fillColor:'#2D5BE3', fillOpacity:.18}).addTo(rings);
+    Object.keys(markers).forEach(function(n){
+      var el = document.getElementById('pin-'+n);
+      if(el) el.className = 'loja-pin' + (n===id ? ' sel' : '');
+    });
+    map.flyTo([lj.lat, lj.lng], 13, {duration:.8});
+  }
+
+  window.addEventListener('message', function(e){
+    if(e.data && e.data.boardosLojas) setLojas(e.data.boardosLojas);
+    if(e.data && e.data.boardosLoja) select(e.data.boardosLoja);
+  });
+  parent.postMessage({boardosMapaPronto:true}, '*');
+</script>
+</body>
+</html>

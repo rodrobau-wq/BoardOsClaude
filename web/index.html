@@ -286,13 +286,20 @@
     <div><b>BoardOS</b><small id="tenantNome" style="display:block;color:var(--muted);font-size:11px;font-weight:500;letter-spacing:.3px">Painel Estratégico</small></div>
   </div>
   <nav class="tabs" id="tabs">
-    <button class="tab on" data-tab="hoje"><span class="ico">◧</span> Início</button>
-    <button class="tab" data-tab="indicadores"><span class="ico">▤</span> Indicadores</button>
+    <button class="tab on" data-tab="hoje"><span class="ico">◧</span> Painel</button>
+    <button class="tab" data-tab="evolucao"><span class="ico">∿</span> Evolução</button>
     <button class="tab" data-tab="estrategia"><span class="ico">◎</span> Plano</button>
+    <button class="tab" data-tab="execucao"><span class="ico">⟳</span> Execução</button>
+    <button class="tab" data-tab="salaconselho"><span class="ico">▦</span> Conselho</button>
+    <button class="tab" data-tab="indicadores"><span class="ico">▤</span> Indicadores</button>
     <button class="tab" data-tab="conselho"><span class="ico">✦</span> Advisor</button>
-    <button class="tab" data-tab="config"><span class="ico">⚙</span> Configuração</button>
+    <button class="tab" data-tab="config"><span class="ico">⚙</span> Minha Rede</button>
     <button class="tab hide" data-tab="admin" id="tabAdmin"><span class="ico">▣</span> Admin</button>
   </nav>
+  <div id="cicloCard" class="hide" style="margin-top:14px;padding:12px;border-radius:11px;background:var(--surface-2);border:1px solid var(--border)">
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);margin-bottom:8px">Ciclo do plano · <span id="cicloAno"></span></div>
+    <div id="cicloItens" style="display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--ink-2)"></div>
+  </div>
   <div class="foot">
     <div class="avatar" id="userAvatar">–</div>
     <div><div style="color:var(--ink-2);font-weight:600" id="userNome">—</div><span id="userPapel"></span></div>
@@ -332,6 +339,26 @@
   <div id="status" class="msg info hide">Clique <b>Carregar</b>.</div>
 
   <div id="conselho" class="hide" style="max-width:900px;display:flex;flex-direction:column;gap:16px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px" class="grid2" id="jornadasRow"></div>
+    <section class="card hide" id="jornadaCard">
+      <header>
+        <div><h2 id="jorTitulo">Entrevista</h2><span class="sub" id="jorProg"></span></div>
+        <button class="linklike" id="jorFechar" style="color:var(--muted)">✕ fechar</button>
+      </header>
+      <div class="body">
+        <div class="desc-q" id="jorPergunta">—</div>
+        <textarea id="jorInput" placeholder="Responda com exemplos concretos…" style="width:100%;box-sizing:border-box;min-height:84px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:9px;padding:10px 12px;font:13.5px var(--font)"></textarea>
+        <div class="desc-nav" style="margin-top:10px">
+          <button class="btn ghost" id="jorAnt">‹ Anterior</button>
+          <button class="btn" id="jorSalvar">Salvar e avançar</button>
+          <button class="btn ghost" id="jorProx">Próxima ›</button>
+          <span style="flex:1"></span>
+          <button class="btn ghost" id="jorGerar">Gerar material</button>
+        </div>
+        <div class="hint" id="jorHint" style="margin-top:8px"></div>
+        <pre id="jorResumo" class="mono hide" style="white-space:pre-wrap;font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px;margin:10px 0 0"></pre>
+      </div>
+    </section>
     <div style="display:flex;justify-content:flex-end">
       <button class="btn ghost" id="btnResumoExec" style="padding:6px 12px;font-size:12.5px">Resumo executivo</button>
     </div>
@@ -350,14 +377,28 @@
   </div>
 
   <div id="plano" class="hide">
-    <div class="seg" id="planSeg" style="width:fit-content" role="tablist" aria-label="Abas do plano">
-      <button data-pt="direcao">Direção</button>
-      <button data-pt="diagnostico">Diagnóstico</button>
-      <button data-pt="metas" class="on">Metas (OKRs)</button>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--faint);margin-right:4px">Ciclo anual</span>
+      <div class="seg" id="cicloSeg"></div>
+      <span style="flex:1"></span>
+      <span style="font-size:11.5px;color:var(--faint)" id="forecastTri"></span>
+      <button class="linklike" id="btnProxCiclo" style="border:1px dashed var(--border);padding:7px 14px;border-radius:9px;color:var(--muted)"></button>
     </div>
 
+    <div class="hide" id="cicloComparar">
+      <div class="gtable">
+        <div class="ghead"><div><h2>Resultados ano a ano</h2><div class="sub">O plano é refeito todo ano — cada ciclo fica gravado: meta → realizado no fechamento</div></div></div>
+        <div class="gcols" style="grid-template-columns:.7fr 1.4fr 1fr 1fr .9fr"><span>Ciclo</span><span>Faturamento (meta → real)</span><span>Margem</span><span>Ruptura</span><span class="tr">OKRs batidos</span></div>
+        <div id="cicloRows"></div>
+        <p style="margin:0;padding:12px 17px;color:var(--faint);font-size:12px">A ambição sobe a cada ciclo: as metas do próximo ano partem do <b style="color:var(--muted)">realizado</b> deste, não da meta antiga. Os ciclos ficam gravados aqui a cada fechamento de ano.</p>
+      </div>
+    </div>
+
+    <div id="cicloCorrente">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px" class="grid2" id="stepper"></div>
+
     <div id="planDirecao" class="hide">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="grid2">
         <section class="card" style="padding:20px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
             <b style="font-size:14.5px">Propósito</b><button class="linklike badge-soft" data-diredit style="font-size:11px">da entrevista · editável</button></div>
@@ -365,12 +406,19 @@
         </section>
         <section class="card" style="padding:20px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <b style="font-size:14.5px">Visão</b><button class="linklike badge-soft" data-diredit style="font-size:11px">da entrevista · editável</button></div>
+            <b style="font-size:14.5px">Essência</b><button class="linklike badge-soft" data-diredit style="font-size:11px">quem somos</button></div>
+          <div id="dirVValores" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span class="hint">—</span></div>
+          <p style="margin:0;color:var(--muted);font-size:12.5px"><b style="color:var(--ink-2)">Competência central:</b> <span id="dirVCompetencia">—</span></p>
+        </section>
+        <section class="card" style="padding:20px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <b style="font-size:14.5px">Visão</b><button class="linklike badge-soft" data-diredit style="font-size:11px">3–5 anos</button></div>
           <p id="dirVVisao" style="margin:0;color:var(--ink-2)">—</p>
         </section>
-        <section class="card" style="padding:20px;grid-column:1/-1">
-          <b style="font-size:14.5px;display:block;margin-bottom:10px">Valores</b>
-          <div id="dirVValores" style="display:flex;gap:10px;flex-wrap:wrap"><span class="hint">—</span></div>
+        <section class="card" style="padding:20px;background:linear-gradient(180deg,var(--accent-soft),var(--surface))">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <b style="font-size:14.5px;color:var(--accent-strong)">Sonho grande</b><button class="linklike badge-soft" data-diredit style="font-size:11px;background:var(--surface)">10+ anos</button></div>
+          <p id="dirVSonho" style="margin:0;color:var(--ink-2)">—</p>
         </section>
       </div>
 
@@ -382,7 +430,8 @@
           <label>Propósito<textarea id="dirProposito" placeholder="Por que a rede existe?"></textarea></label>
           <label>Visão<textarea id="dirVisao" placeholder="Onde queremos chegar em 3–5 anos?"></textarea></label>
           <label>Valores<textarea id="dirValores" placeholder="O que não abrimos mão? (um por linha)"></textarea></label>
-          <label>Objetivo de longo prazo<textarea id="dirObjetivo" placeholder="O sonho grande, em uma frase"></textarea></label>
+          <label>Sonho grande (10+ anos)<textarea id="dirObjetivo" placeholder="O sonho grande, em uma frase"></textarea></label>
+          <label>Competência central<textarea id="dirCompetencia" placeholder="O que vocês fazem que os concorrentes não replicam?"></textarea></label>
         </div>
       </section>
 
@@ -432,15 +481,63 @@
         <div id="okrs"></div>
       </section>
     </div>
+
+    <div id="planTatico" class="hide">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <span class="sub" id="iniSub"></span>
+        <button class="btn ghost" id="iniAdd" style="padding:6px 12px;font-size:12.5px">＋ Iniciativa</button>
+      </div>
+      <div id="iniLista" style="display:flex;flex-direction:column;gap:14px">
+        <span class="hint">Sem iniciativas ainda — crie a primeira e ligue as ações 5W2H a ela.</span>
+      </div>
+      <p style="margin:12px 0 16px;color:var(--faint);font-size:12px">Cada ação segue 5W2H: o quê, por quê (ligado ao OKR), onde, quando, quem (dono único), como e quanto custa.</p>
+
+      <section class="card">
+        <header><h2>Ações avulsas — 5W2H</h2>
+          <button class="btn ghost" id="acaoAdd" style="padding:6px 12px;font-size:12.5px">＋ Ação</button>
+        </header>
+        <div class="body" style="overflow-x:auto">
+          <table class="tbl" id="acoesTbl">
+            <thead><tr><th>O quê</th><th>Quem</th><th>Quando</th><th>Custo</th><th>Meta ligada</th><th>Status</th><th></th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    </div>
   </div>
 
   <div id="config" class="hide">
     <div class="seg" id="cfgSeg" style="width:fit-content" role="tablist" aria-label="Seções de configuração">
-      <button data-ct="dados" class="on">Dados</button>
+      <button data-ct="rede" class="on">Rede</button>
+      <button data-ct="dados">Dados</button>
       <button data-ct="lojas">Lojas</button>
       <button data-ct="feriados">Feriados</button>
       <button data-ct="usuarios">Usuários</button>
-      <button data-ct="iniciativas">Iniciativas</button>
+    </div>
+
+    <div id="cfgRede">
+      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:18px;align-items:start" class="grid2">
+        <div class="gtable">
+          <div class="ghead">
+            <div><h2>Mapa da rede — áreas de influência</h2><div class="sub">Clique numa loja (no mapa ou na lista) para ver as áreas primária, secundária e terciária</div></div>
+            <button class="btn" id="redeLojaAdd" style="padding:8px 14px;font-size:12.5px;white-space:nowrap">+ Adicionar loja</button>
+          </div>
+          <iframe id="mapaLojas" src="mapa-lojas.html" title="Mapa das lojas com áreas de influência" style="display:block;width:100%;height:520px;border:none"></iframe>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:18px">
+          <div class="gtable">
+            <div class="ghead"><div><h2>Lojas</h2><div class="sub">Cadastre latitude/longitude para posicionar no mapa</div></div></div>
+            <div id="redeLojasLista"><span class="hint" style="display:block;padding:14px 17px">Carregando…</span></div>
+          </div>
+          <div class="gtable">
+            <div class="ghead"><div><h2 id="demoTitulo">Demografia</h2><div class="sub">IBGE · contexto do município da loja</div></div></div>
+            <div id="demoBox" style="padding:14px 17px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--ink-2)">
+              <span class="hint">Selecione uma loja.</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="cfgDados">
@@ -473,32 +570,6 @@
             <span class="hint" id="upHint">Escolha o arquivo: leio o cabeçalho e sugiro o mapa de colunas.</span>
             <button class="btn hide" id="upEnviar">Confirmar e processar</button>
           </div>
-        </div>
-      </section>
-    </div>
-
-    <div id="cfgIniciativas" class="hide">
-      <section class="card">
-        <header><h2>Precisa de atenção</h2><span class="sub" id="alertSub"></span></header>
-        <div class="body alerts" id="alertas"></div>
-      </section>
-
-      <section class="card">
-        <header><h2>Iniciativas — Fato → Causa → Ação</h2>
-          <button class="btn ghost" id="fcaAdd" style="padding:6px 12px;font-size:12.5px">＋ Plano</button>
-        </header>
-        <div class="body" id="fca"></div>
-      </section>
-
-      <section class="card">
-        <header><h2>Plano de Ação — 5W2H</h2>
-          <button class="btn ghost" id="acaoAdd" style="padding:6px 12px;font-size:12.5px">＋ Ação</button>
-        </header>
-        <div class="body" style="overflow-x:auto">
-          <table class="tbl" id="acoesTbl">
-            <thead><tr><th>O quê</th><th>Quem</th><th>Quando</th><th>Custo</th><th>Meta ligada</th><th>Status</th><th></th></tr></thead>
-            <tbody></tbody>
-          </table>
         </div>
       </section>
     </div>
@@ -571,9 +642,122 @@
       <header><h2>Comece por aqui — monte o BoardOS da sua rede</h2><span class="sub" id="chkSub"></span></header>
       <div class="body" id="checklist"></div>
     </section>
-    <div class="kpis" id="kpis"></div>
+    <!-- faixa Propósito / Visão / Sonho grande -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px" class="grid2">
+      <section class="card" style="padding:16px 17px">
+        <div class="cap2" style="margin:0 0 6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Propósito</div>
+        <p id="painelProposito" style="margin:0;font-size:13px;color:var(--ink-2)">—</p>
+      </section>
+      <section class="card" style="padding:16px 17px">
+        <div class="cap2" style="margin:0 0 6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px">Visão</div>
+        <p id="painelVisao" style="margin:0;font-size:13px;color:var(--ink-2)">—</p>
+      </section>
+      <section class="card" style="padding:16px 17px;background:linear-gradient(180deg,var(--accent-soft),var(--surface))">
+        <div class="cap2" style="margin:0 0 6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--accent-strong)">Sonho grande</div>
+        <p id="painelSonho" style="margin:0;font-size:13px;color:var(--ink-2)">—</p>
+      </section>
+    </div>
 
-    <div class="grid2">
+    <!-- semáforo de OKRs | indicadores de saúde -->
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:18px;align-items:start" class="grid2">
+      <div class="gtable">
+        <div class="ghead"><h2 id="semaforoTitulo">OKRs — dashboard semáforo</h2>
+          <button class="linklike" data-goexec>ir para execução →</button></div>
+        <div class="gcols" style="grid-template-columns:1.7fr .9fr 1.1fr .8fr 1.4fr">
+          <span>Objetivo</span><span>Status</span><span>Progresso</span><span>Dono</span><span>Próxima ação</span>
+        </div>
+        <div id="okrSemaforo"><span class="hint" style="display:block;padding:14px 17px">Sem metas cadastradas ainda.</span></div>
+      </div>
+      <section class="card" style="padding:0;overflow:hidden">
+        <header style="margin:0">
+          <div><h2>Indicadores de saúde</h2><div class="sub" id="saudeSub"></div></div>
+          <button class="linklike" data-goevol>evolução →</button>
+        </header>
+        <div style="padding:14px 17px;display:flex;flex-direction:column;gap:11px" id="kpiSaude"></div>
+      </section>
+    </div>
+
+    <!-- iniciativas-chave | riscos e dependências -->
+    <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:18px;align-items:start" class="grid2">
+      <div class="gtable">
+        <div class="ghead"><h2>Iniciativas-chave</h2>
+          <button class="linklike" data-gotatico>ver plano tático →</button></div>
+        <div id="iniHome"><span class="hint" style="display:block;padding:14px 17px">Sem iniciativas — crie no Plano › Tático.</span></div>
+      </div>
+      <section class="card" style="padding:0;overflow:hidden">
+        <header style="margin:0"><h2>Riscos e dependências</h2></header>
+        <div style="padding:14px 17px;display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:var(--ink-2)" id="riscosHome">
+          <span class="hint">Nenhum risco detectado.</span>
+        </div>
+      </section>
+    </div>
+
+    <!-- faixa do Advisor -->
+    <section class="card" style="padding:16px 17px;display:flex;gap:11px">
+      <div class="ai">✦</div>
+      <div style="flex:1;min-width:0">
+        <div id="aiTexto" class="hide" style="font-size:12.5px;white-space:pre-wrap;line-height:1.55;color:var(--ink-2)"></div>
+        <p id="advisorResumo" style="margin:0;font-size:12.5px;color:var(--ink-2)">—</p>
+        <div style="margin-top:8px;display:flex;gap:14px;align-items:center">
+          <button class="linklike" data-goexec>ver ciclo FCA →</button>
+          <button class="linklike" id="advisorLink">falar com o Advisor →</button>
+          <span class="sub" id="aiFonte" style="margin-left:auto">✦ IA</span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============ Evolução (12m + atual + 6m) ============ -->
+  <div id="evolucao" class="hide">
+    <div class="gtable">
+      <div class="ghead" style="flex-wrap:wrap">
+        <div><h2 id="evoTitulo">Faturamento — últimos 12 meses · atual · próximos 6</h2>
+          <div class="sub" id="evoSub"></div></div>
+        <div class="seg" id="evoSeg"></div>
+        <div class="legend" style="font-size:12px">
+          <span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:color-mix(in srgb,var(--accent) 50%,transparent);vertical-align:-1px;margin-right:5px"></i>Realizado</span>
+          <span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:var(--accent-strong);vertical-align:-1px;margin-right:5px"></i>Mês atual</span>
+          <span><i style="display:inline-block;width:11px;height:11px;border-radius:3px;background:repeating-linear-gradient(45deg,color-mix(in srgb,var(--accent) 38%,transparent) 0 3px,color-mix(in srgb,var(--accent) 12%,transparent) 3px 6px);border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);vertical-align:-1px;margin-right:5px;box-sizing:border-box"></i>Projeção</span>
+          <span><i style="display:inline-block;width:14px;border-top:2px dashed var(--ink-2);vertical-align:3px;margin-right:5px"></i>Meta</span>
+        </div>
+      </div>
+      <div style="padding:18px 17px 12px">
+        <div id="evoChart" style="position:relative"></div>
+        <div id="evoLabels" style="display:flex;gap:6px;margin-top:8px"></div>
+      </div>
+    </div>
+
+    <div class="gtable">
+      <div class="ghead" style="flex-wrap:wrap">
+        <div><h2>Preço médio × Custo médio</h2>
+          <div class="sub">Índice base 100 = 1º mês da janela · tracejado = mês corrente parcial · IPCA alimentos (IBGE): integração em breve</div></div>
+        <div class="legend" style="font-size:12px">
+          <span><i style="display:inline-block;width:18px;border-top:3px solid var(--accent);vertical-align:3px;margin-right:5px"></i>Preço médio</span>
+          <span><i style="display:inline-block;width:18px;border-top:3px solid var(--crit);vertical-align:3px;margin-right:5px"></i>Custo médio</span>
+        </div>
+      </div>
+      <div style="padding:14px 17px 6px">
+        <svg id="idxChart" viewBox="0 0 720 200" style="display:block;width:100%;height:auto" role="img" aria-label="Evolução indexada de preço médio e custo médio"></svg>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 17px 15px;font-size:12px" id="idxChips"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px" class="grid2" id="sparksRow"></div>
+
+    <div class="gtable">
+      <div class="ghead">
+        <div><h2>Tendências detectadas</h2><div class="sub">Regressão sobre as últimas 12 semanas de venda diária · atualizado ao carregar</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 17px" class="grid2" id="tendGrid">
+        <span class="hint">Carregando…</span>
+      </div>
+    </div>
+
+    <section class="card" style="padding:16px 17px;display:flex;gap:11px">
+      <div class="ai">✦</div>
+      <div id="evoLeitura" style="font-size:12.5px;color:var(--ink-2);display:flex;flex-direction:column;gap:6px">—</div>
+    </section>
+
     <section class="card">
       <header>
         <div><h2 id="chartTitle">Vendas diárias</h2><div class="sub" id="chartNote"></div></div>
@@ -583,46 +767,71 @@
         <svg class="chart" id="chart" viewBox="0 0 720 270" preserveAspectRatio="none"></svg>
       </div>
     </section>
+  </div>
 
-    <div class="col">
-    <section class="card">
-      <header><h2>Metas do ano (OKRs)</h2><button class="linklike" id="okrsHomeLink">ver plano →</button></header>
-      <div class="body" id="okrsHome"><span class="hint">Sem metas cadastradas ainda.</span></div>
-    </section>
+  <!-- ============ Execução e Controle ============ -->
+  <div id="execucao" class="hide">
+    <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:18px;align-items:start" class="grid2">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <h2 style="margin:0;font-size:15px;letter-spacing:-.2px">Ciclo FCA — desvios do mês</h2>
+          <button class="btn" id="fcaAdd" style="padding:8px 14px;font-size:12.5px">+ Registrar FCA</button>
+        </div>
+        <div id="fca" style="display:flex;flex-direction:column;gap:14px"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="gtable">
+          <div class="ghead"><div><h2>Rituais de gestão</h2><div class="sub">Disciplina que mantém o plano vivo</div></div>
+            <button class="ib" id="ritualAdd" title="Adicionar ritual">＋</button></div>
+          <div id="rituaisLista"><span class="hint" style="display:block;padding:14px 17px">Carregando…</span></div>
+        </div>
+        <section class="card" style="padding:0;overflow:hidden">
+          <header style="margin:0"><div><h2>Reflexão do mês</h2><div class="sub">Preparada pelo Advisor para a reunião mensal</div></div></header>
+          <div style="padding:14px 17px;display:flex;flex-direction:column;gap:9px;font-size:12.5px;color:var(--ink-2)" id="reflexaoMes">—</div>
+        </section>
+      </div>
+    </div>
+  </div>
 
-    <section class="card" style="flex:1">
-      <header><h2>Resumo do Advisor</h2><span class="sub" id="aiFonte">✦ IA</span></header>
-      <div class="body" style="display:flex;gap:12px">
-        <div class="ai">✦</div>
-        <div style="flex:1;min-width:0">
-          <div id="aiTexto" class="hide" style="font-size:12.5px;white-space:pre-wrap;line-height:1.55;color:var(--ink-2)"></div>
-          <div id="advisorResumo" style="font-size:12.5px;line-height:1.55;color:var(--ink-2)"></div>
-          <div style="margin-top:10px"><button class="linklike" id="advisorLink">ver análise →</button></div>
+  <!-- ============ Sala do Conselho ============ -->
+  <div id="salaconselho" class="hide">
+    <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:18px;align-items:start" class="grid2">
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="gtable">
+          <div class="ghead">
+            <div><h2 id="reuniaoTitulo">Reunião do conselho</h2><div class="sub" id="reuniaoSub">nenhuma reunião agendada</div></div>
+            <span class="sub" id="reuniaoChip"></span>
+          </div>
+          <div class="gcols" style="grid-template-columns:2fr .6fr 1fr"><span>Pauta</span><span>Tempo</span><span>Material</span></div>
+          <div id="pautaLista"><span class="hint" style="display:block;padding:14px 17px">—</span></div>
+          <div style="padding:12px 17px;display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn" id="btnCaderno" style="padding:8px 14px;font-size:12.5px">Gerar caderno da reunião</button>
+            <button class="btn ghost" id="btnPauta" style="padding:8px 14px;font-size:12.5px">Editar pauta</button>
+            <button class="btn ghost" id="btnReuniao" style="padding:8px 14px;font-size:12.5px">Agendar / editar reunião</button>
+          </div>
+          <div id="cadernoBox" class="hide" style="padding:0 17px 15px"><pre id="cadernoTxt" class="mono" style="white-space:pre-wrap;font-size:12px;color:var(--ink-2);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px;margin:0"></pre></div>
+        </div>
+        <div class="gtable">
+          <div class="ghead"><div><h2>Deliberações</h2><div class="sub">Decisões do conselho e acompanhamento</div></div>
+            <button class="ib" id="delibAdd" title="Nova deliberação">＋</button></div>
+          <div class="gcols" style="grid-template-columns:2fr .9fr .9fr 1fr"><span>Deliberação</span><span>Data</span><span>Status</span><span>Follow-up</span></div>
+          <div id="delibLista"><span class="hint" style="display:block;padding:14px 17px">Nenhuma deliberação registrada.</span></div>
         </div>
       </div>
-    </section>
-    </div>
-    </div>
-
-    <section class="card hide" id="atencaoCard">
-      <header><h2>Precisa de atenção</h2><span class="sub" id="atencaoSub"></span></header>
-      <div class="body alerts" id="atencaoHome"></div>
-    </section>
-
-    <section class="card">
-      <header><h2>Últimos 13 meses & próximos 3</h2><span class="sub" id="mensalSub"></span></header>
-      <div class="body">
-        <svg class="chart" id="mensalChart" viewBox="0 0 720 240" preserveAspectRatio="none"></svg>
-        <div class="legend" style="margin-top:10px">
-          <span><i style="display:inline-block;width:12px;height:12px;background:var(--accent);border-radius:3px;vertical-align:-2px"></i> Fechado</span>
-          <span><i style="display:inline-block;width:12px;height:12px;background:var(--accent);opacity:.45;border-radius:3px;vertical-align:-2px"></i> Projeção do corrente</span>
-          <span><i style="display:inline-block;width:12px;height:12px;border:2px dashed var(--accent);border-radius:3px;vertical-align:-2px;box-sizing:border-box"></i> Próximos meses</span>
-          <span><i style="display:inline-block;width:14px;height:0;border-top:3px solid var(--warn);vertical-align:3px"></i> Programado (meta)</span>
+      <div style="display:flex;flex-direction:column;gap:18px">
+        <div class="gtable">
+          <div class="ghead"><h2>Diretoria e conselho</h2>
+            <button class="ib" id="membroAdd" title="Adicionar membro">＋</button></div>
+          <div id="membrosLista"><span class="hint" style="display:block;padding:14px 17px">Cadastre a diretoria e o conselho.</span></div>
         </div>
-        <div class="hint" id="mensalNota" style="margin-top:6px"></div>
+        <section class="card" style="padding:0;overflow:hidden">
+          <header style="margin:0"><h2>Atas anteriores</h2></header>
+          <div style="padding:12px 17px;display:flex;flex-direction:column;gap:8px;font-size:12.5px" id="atasLista">
+            <span class="hint">Reuniões realizadas aparecem aqui.</span>
+          </div>
+        </section>
       </div>
-    </section>
-
+    </div>
   </div>
 
   <!-- ============ Indicadores (drill lojas → categorias) ============ -->
@@ -726,10 +935,15 @@ async function load(){
     var fcast = null;
     try{ fcast = await jget("/forecast/mes?ano="+ano+"&mes="+mes); }catch(_){}
     last = {cmp: cmp, atual: atual.dias, base: base.dias, fc: fcast};
-    render();
+    EVO = null;            // Evolução recarrega no próximo acesso
     indLojaDrill = null;   // troca de período/empresa desfaz o drill de loja
-    try{ var km = await jget("/kpi/mensal"); renderMensal(km); }
-    catch(_){ renderMensal(null); }
+    try{ var dir = await jget("/direcao"); DIRECAO = dir; renderPainelDirecao(dir); }
+    catch(_){ DIRECAO = {}; renderPainelDirecao({}); }
+    try{ var ini = await jget("/iniciativas"); INIS = ini.iniciativas || []; }
+    catch(_){ INIS = []; }
+    try{ var dl = await jget("/deliberacoes"); DELIBS = dl.deliberacoes || []; }
+    catch(_){ DELIBS = []; }
+    renderIniHome();
     try{ var ok = await jget("/okrs"); renderOkrs(ok.objetivos); }
     catch(_){ renderOkrs([]); }
     try{ var lr = await jget("/lojas/resumo?ano="+ano+"&mes="+mes); indLojasCache = lr.lojas || []; }
@@ -737,6 +951,8 @@ async function load(){
     if(TAB === "indicadores") renderIndLojas();
     try{ var al = await jget("/alertas"); renderAlertas(al.alertas); }
     catch(_){ renderAlertas([]); }
+    render();
+    updateCicloCard();
     refreshFca();
     refreshUsuarios();
     // IA em segundo plano: se disponível, substitui o resumo estatístico
@@ -769,9 +985,6 @@ var MES_NOME = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho",
                 "Agosto","Setembro","Outubro","Novembro","Dezembro"];
 function render(){
   var c = last.cmp;
-
-  // 4 KPI cards do protótipo: rótulo + farol com texto, valor 27px, chip por lente
-  var k = el("kpis"); k.innerHTML="";
   var fatSum=0, margSum=0, cupSum=0, itnSum=0, margBase=0, fatBase=0;
   last.atual.forEach(function(r){ fatSum+=+r.faturamento_liq; margSum+=+(r.margem||0);
     cupSum+=+(r.cupons||0); itnSum+=+(r.itens||0); });
@@ -783,55 +996,114 @@ function render(){
   var margBasePct = (margBase > 0 && margBase < fatBase) ? margBase/fatBase : null;
   var margDelta = (margPct!=null && margBasePct!=null) ? (margPct - margBasePct) : null;
 
-  function farol(delta){                    // led + texto — nunca cor sozinha
-    if(delta==null) return {cls:null, txt:""};
-    if(delta>=0) return {cls:"g", txt:"No alvo"};
-    if(delta>-0.03) return {cls:"a", txt:"Atenção"};
-    return {cls:"r", txt:"Crítico"};
+  // Indicadores de saúde do Painel v2: nome · valor · chip por lente
+  el("saudeSub").textContent = periodoLabel() + " · lente " + (lens==="varejo"?"varejo":"civil");
+  function linha(nome, valor, delta, fmt, cap){
+    var chip = delta!=null
+      ? '<span class="chip '+(delta>=0?"g":"r")+'">'+(delta>=0?"▲":"▼")+" "+fmt(delta)+'</span>'
+      : '<span class="chip n">'+(cap||"—")+'</span>';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">'
+      + '<span style="color:var(--muted);font-size:12.5px">'+nome+'</span>'
+      + '<span style="display:flex;align-items:center;gap:9px"><b class="num" style="font-size:14px">'+valor+'</b>'+chip+'</span></div>';
   }
-  var cards = [
-    {lbl:"Faturamento (mês)", val: brl(c ? c.total_atual : fatSum),
-     delta: lensVar, dfmt: pct, f: farol(lensVar)},
-    {lbl:"Margem bruta", val: margPct!=null ? (margPct*100).toFixed(1)+"%" : "—",
-     delta: margDelta, dfmt: function(v){ return (v>=0?"+":"−")+Math.abs(v*100).toFixed(1)+"pp"; },
-     f: farol(margDelta), cap: margPct==null ? "requer custo nos dados importados" : null},
-    {lbl:"Ruptura", val:"—", delta:null, f:{cls:null, txt:""}, cap:"requer integração de estoque"},
-    {lbl:"Ticket médio", val: (c && c.ticket_atual) ? "R$ "+(+c.ticket_atual).toFixed(2)
-      : (ticketReal ? "R$ "+ticketReal.toFixed(2) : "—"),
-     delta: tickVar, dfmt: pct, f: farol(tickVar)}
-  ];
-  cards.forEach(function(x){
-    var st = x.f.cls
-      ? '<span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase" class="p'+x.f.cls+'">'
-        + '<span class="led '+x.f.cls+'" style="margin-left:0"></span>'+x.f.txt+'</span>'
-      : "";
-    var chip = x.delta!=null
-      ? '<div><span class="chip '+(x.delta>=0?"g":"r")+'">'+(x.delta>=0?"▲":"▼")+" "+x.dfmt(x.delta)
-        +' <span style="color:var(--faint);font-weight:600">vs. ano ant.</span></span></div>' : "";
-    var d=document.createElement("div"); d.className="kpi";
-    d.innerHTML='<div class="lbl">'+x.lbl+st+'</div>'+
-      '<div class="val num">'+x.val+'</div>'+chip+
-      (x.cap?'<div class="cap2">'+x.cap+'</div>':"");
-    k.appendChild(d);
-  });
+  var ppFmt = function(v){ return (v>=0?"+":"−")+Math.abs(v*100).toFixed(1)+"pp"; };
+  el("kpiSaude").innerHTML =
+    linha("Faturamento (mês)", brl(c ? c.total_atual : fatSum), lensVar, pct) +
+    linha("Margem bruta", margPct!=null ? (margPct*100).toFixed(1)+"%" : "—", margDelta, ppFmt,
+          margPct==null ? "requer custo" : "—") +
+    linha("Ruptura", "—", null, null, "requer estoque") +
+    linha("Ticket médio", (c && c.ticket_atual) ? "R$ "+(+c.ticket_atual).toFixed(2)
+          : (ticketReal ? "R$ "+ticketReal.toFixed(2) : "—"), tickVar, pct);
 
-  // Resumo do Advisor — texto por lente, como no protótipo
+  // faixa do Advisor — leitura da semana/mês por lente
   var res = el("advisorResumo");
   if(c){
     var vC = pct(c.var_civil), vV = pct(c.var_ajustada);
-    if(lens==="civil"){
-      res.innerHTML = Math.abs(c.efeito_calendario)>=0.01
-        ? 'Na lente civil o mês fecha em <b>'+vC+'</b>, mas o calendário trocou dias da semana — o desempenho real (like-for-like) é <b>'+vV+'</b>. Alterne para <b>Varejo</b>.'
-        : 'Fechamento civil <b>'+vC+'</b> vs. ano anterior, em linha com a demanda real (<b>'+vV+'</b>) — efeito de calendário desprezível.';
-    } else {
-      res.innerHTML = 'Like-for-like a rede varia <b>'+vV+'</b> vs. ano anterior (civil: <b>'+vC+'</b>, efeito de calendário '+pct(c.efeito_calendario)+').';
-    }
+    var ritmo = okrCache.length
+      ? "O plano está <b>" + Math.round(okrCache.reduce(function(s,o){return s+objProgresso(o);},0)/okrCache.length*100) + "% no ritmo</b>. "
+      : "";
+    var pior = alertCache.filter(function(a){return a.sev==="r";})[0];
+    res.innerHTML = ritmo + (lens==="civil"
+      ? 'Na lente civil o mês fecha em <b>'+vC+'</b>; like-for-like o desempenho real é <b>'+vV+'</b>.'
+      : 'Like-for-like a rede varia <b>'+vV+'</b> vs. ano anterior (civil <b>'+vC+'</b>).')
+      + (pior ? ' O desvio que mais ameaça o plano: <b>'+pior.titulo+'</b>.' : '');
   } else {
     res.innerHTML = '<span class="hint">A leitura comparativa aparece quando houver o mesmo mês do ano anterior na base.</span>';
   }
 
   drawChart();
 }
+function renderPainelDirecao(dir){
+  el("painelProposito").textContent = dir.proposito || "Defina o propósito no Plano › Direção.";
+  el("painelVisao").textContent = dir.visao || "Defina a visão no Plano › Direção.";
+  el("painelSonho").textContent = dir.objetivo_lp || "Defina o sonho grande no Plano › Direção.";
+}
+var INIS = [], DELIBS = [];
+var INI_ST = {done:"CONCLUÍDA", curso:"EM CURSO", nao:"NÃO INICIADA", bloq:"BLOQUEADA"};
+function iniStatus(i){
+  if(!i.acoes.length) return {txt:"NÃO INICIADA", cls:"hint"};
+  if(!i.dono || /a definir/i.test(i.dono||"")) return {txt:"BLOQUEADA", cls:"pr"};
+  if(i.acoes.every(function(a){return a.status==="concluida";})) return {txt:"CONCLUÍDA", cls:"pg"};
+  if(i.acoes.some(function(a){return a.status==="em_andamento";})) return {txt:"EM CURSO", cls:"pa"};
+  return {txt:"A INICIAR", cls:"hint"};
+}
+function renderIniHome(){
+  var box = el("iniHome");
+  if(!INIS.length){
+    box.innerHTML = '<span class="hint" style="display:block;padding:14px 17px">Sem iniciativas — crie no Plano › Tático.</span>'; return;
+  }
+  box.innerHTML = INIS.map(function(i){
+    var st = iniStatus(i);
+    return '<div class="grow" style="grid-template-columns:1.8fr 1fr .8fr .9fr">'
+      + '<span style="font-weight:600">'+i.nome+'</span>'
+      + '<span style="color:var(--muted);font-size:11.5px">'+(i.objetivo||"—")+'</span>'
+      + '<span style="color:var(--muted)">'+(i.dono||"a definir")+'</span>'
+      + '<span class="'+st.cls+'" style="font-weight:700;font-size:11px">● '+st.txt+'</span></div>';
+  }).join("");
+}
+function renderRiscos(){
+  var riscos = [];
+  alertCache.slice(0,3).forEach(function(a){
+    riscos.push({sev:a.sev, txt:"<b>"+a.titulo+".</b> "+a.detalhe});
+  });
+  DELIBS.filter(function(d){return d.status==="em_pauta";}).slice(0,2).forEach(function(d){
+    riscos.push({sev:"a", txt:"<b>"+d.texto+"</b> depende de deliberação do conselho"+(d.data?" (reunião de "+fmtDataBr(d.data)+")":"")+"."});
+  });
+  INIS.forEach(function(i){
+    var st = iniStatus(i);
+    if(st.txt==="BLOQUEADA") riscos.push({sev:"a", txt:"<b>"+i.nome+"</b> sem dono dedicado — risco de atraso."});
+  });
+  el("riscosHome").innerHTML = riscos.length
+    ? riscos.slice(0,5).map(function(r){
+        var ic = r.sev==="r" ? '<span class="pr">▲</span>' : '<span class="pa">◆</span>';
+        return '<div style="display:flex;gap:9px">'+ic+'<span>'+r.txt+'</span></div>';
+      }).join("")
+    : '<span class="hint">Nenhum risco detectado. 👍</span>';
+}
+function proximaAcaoDoObjetivo(oid){
+  for(var i=0;i<INIS.length;i++){
+    if(INIS[i].objetivo_id===oid){
+      var a = INIS[i].acoes.filter(function(x){return x.status!=="concluida" && x.status!=="cancelada";})[0];
+      if(a) return a.oque;
+    }
+  }
+  return "—";
+}
+function updateCicloCard(){
+  el("cicloCard").classList.remove("hide");
+  el("cicloAno").textContent = el("ano").value;
+  var temDir = !!(DIRECAO && (DIRECAO.proposito||DIRECAO.visao));
+  var temDiag = swotCache.length > 0;
+  var temMetas = okrCache.length > 0;
+  var temTat = INIS.length > 0;
+  function li(ok, txt){ return ok ? "<span>✓ "+txt+"</span>" : '<span style="color:var(--faint)">○ '+txt+"</span>"; }
+  el("cicloItens").innerHTML =
+    li(temDir, "Direção definida") + li(temDiag, "Diagnóstico feito") +
+    li(temMetas, "Metas ("+okrCache.length+" OKRs)") +
+    li(temTat, "Plano tático ("+INIS.length+" iniciativas)") +
+    '<span style="color:var(--accent-strong);font-weight:600">● Executando</span>';
+}
+var DIRECAO = null;
 
 async function jsend(method, path, body){
   var h = {"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"};
@@ -983,8 +1255,9 @@ function renderAdvisorFeed(){
     ? advInsights.map(insightCard).join("")
     : '<span class="hint">As análises aparecem quando o painel tiver dados carregados (tela Início).</span>';
 }
-var VIEW_TITLES = {hoje:"Painel Estratégico", indicadores:"Indicadores",
-  estrategia:"Plano", conselho:"Advisor", config:"Configuração · Dados",
+var VIEW_TITLES = {hoje:"Painel Estratégico", evolucao:"Evolução dos Indicadores",
+  estrategia:"Plano", execucao:"Execução e Controle", salaconselho:"Sala do Conselho",
+  indicadores:"Indicadores", conselho:"Advisor", config:"Configuração · Minha Rede",
   admin:"Administração da Plataforma"};
 function showTab(t){
   TAB = t;
@@ -994,39 +1267,75 @@ function showTab(t){
   });
   el("conselho").classList.toggle("hide", t !== "conselho");
   el("plano").classList.toggle("hide", t !== "estrategia");
+  el("evolucao").classList.toggle("hide", t !== "evolucao");
+  el("execucao").classList.toggle("hide", t !== "execucao");
+  el("salaconselho").classList.toggle("hide", t !== "salaconselho");
   el("indicadores").classList.toggle("hide", t !== "indicadores");
   el("config").classList.toggle("hide", t !== "config");
   el("admin").classList.toggle("hide", t !== "admin");
   if(t === "hoje"){ if(last) el("content").classList.remove("hide"); }
   else el("content").classList.add("hide");
+  if(t === "evolucao") loadEvolucao();
+  if(t === "execucao") loadExecucao();
+  if(t === "salaconselho") loadSala();
   if(t === "indicadores") loadIndicadores();
-  if(t === "conselho") renderAdvisorFeed();
+  if(t === "conselho"){ renderAdvisorFeed(); refreshJornadas(); }
   if(t === "estrategia" && !planoCarregado) loadPlano();
-  if(t === "config"){ refreshImportacoes(); refreshFeriados(); refreshLojas(); refreshAcoes(); }
+  if(t === "config"){ refreshLojas(); refreshImportacoes(); refreshFeriados(); showCfgTab(CFG_TAB); }
   if(t === "admin") loadAdmin();
 }
-var PLAN_TAB = "metas";
+var PLAN_TAB = "direcao";
+var ETAPAS = [
+  {tab:"direcao", nome:"Direção"},
+  {tab:"diagnostico", nome:"Diagnóstico"},
+  {tab:"metas", nome:"Metas (OKRs)"},
+  {tab:"tatico", nome:"Plano Tático"},
+  {tab:"exec", nome:"Execução"}
+];
+function etapaStatus(tab){
+  if(tab==="direcao") return (DIRECAO && (DIRECAO.proposito||DIRECAO.visao)) ? {ok:true, txt:"definida"} : {ok:false, txt:"a definir"};
+  if(tab==="diagnostico") return swotCache.length ? {ok:true, txt:swotCache.length+" itens no SWOT"} : {ok:false, txt:"a fazer"};
+  if(tab==="metas") return okrCache.length ? {ok:true, txt:okrCache.length+" objetivos"} : {ok:false, txt:"a definir"};
+  if(tab==="tatico") return INIS.length ? {ok:true, txt:INIS.length+" iniciativas"} : {ok:false, txt:"a montar"};
+  return {ok:false, txt:"em curso → tela Execução", exec:true};
+}
+function renderStepper(){
+  el("stepper").innerHTML = ETAPAS.map(function(e, i){
+    var st = etapaStatus(e.tab);
+    var ativa = PLAN_TAB === e.tab;
+    var num = st.ok ? "✓" : (i+1);
+    return '<button data-etapa="'+e.tab+'" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:12px 14px;'
+      + 'border-radius:12px;box-sizing:border-box;width:100%;background:var(--surface);'
+      + 'border:'+(ativa?"2px solid var(--accent)":"1px solid var(--border)")+';box-shadow:var(--shadow)">'
+      + '<span style="display:flex;align-items:center;gap:8px"><span style="width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-weight:700;font-size:11px;'
+      + 'background:'+(st.ok?"var(--good-soft)":"var(--accent-soft)")+';color:'+(st.ok?"var(--good)":"var(--accent-strong)")+'">'+num+'</span>'
+      + '<b style="font-size:12.5px">'+e.nome+'</b></span>'
+      + '<span style="font-size:11px;font-weight:600;color:'+(st.exec?"var(--accent-strong)":st.ok?"var(--good)":"var(--faint)")+'">'+st.txt+'</span></button>';
+  }).join("");
+}
 function showPlanTab(pt){
   PLAN_TAB = pt;
-  Array.prototype.forEach.call(document.querySelectorAll("#planSeg button"), function(b){
-    b.classList.toggle("on", b.getAttribute("data-pt") === pt);
-  });
   el("planDirecao").classList.toggle("hide", pt !== "direcao");
   el("planDiag").classList.toggle("hide", pt !== "diagnostico");
   el("planMetas").classList.toggle("hide", pt !== "metas");
+  el("planTatico").classList.toggle("hide", pt !== "tatico");
+  if(pt === "tatico"){ renderTatico(); refreshAcoes(); }
+  renderStepper();
 }
-var CFG_TAB = "dados";
+var CFG_TAB = "rede";
 function showCfgTab(ct){
   CFG_TAB = ct;
   Array.prototype.forEach.call(document.querySelectorAll("#cfgSeg button"), function(b){
     b.classList.toggle("on", b.getAttribute("data-ct") === ct);
   });
+  el("cfgRede").classList.toggle("hide", ct !== "rede");
   el("cfgDados").classList.toggle("hide", ct !== "dados");
   el("cfgLojas").classList.toggle("hide", ct !== "lojas");
   el("cfgFeriados").classList.toggle("hide", ct !== "feriados");
   el("cfgUsuarios").classList.toggle("hide", ct !== "usuarios");
-  el("cfgIniciativas").classList.toggle("hide", ct !== "iniciativas");
-  el("viewTitle").textContent = ct === "dados" ? "Configuração · Dados" : "Configuração";
+  el("viewTitle").textContent = ct === "rede" ? "Configuração · Minha Rede"
+    : ct === "dados" ? "Configuração · Dados" : "Configuração";
+  if(ct === "rede") renderRede();
 }
 
 var CLI_ST = {trial:"Trial", ativo:"Ativo", inadimplente:"Inadimplente", cancelado:"Suspenso"};
@@ -1106,6 +1415,7 @@ async function loadPlano(){
     el("dirVisao").value = dir.visao || "";
     el("dirValores").value = dir.valores || "";
     el("dirObjetivo").value = dir.objetivo_lp || "";
+    el("dirCompetencia").value = dir.competencia || "";
     renderDirecaoView(dir);
   }catch(_){ renderDirecaoView({}); }
   refreshSwot(); refreshRadar();
@@ -1114,10 +1424,14 @@ async function loadPlano(){
 function renderDirecaoView(dir){
   el("dirVProposito").textContent = dir.proposito || "Ainda sem propósito definido — clique em “editável” para escrever, ou responda a Entrevista de Descoberta abaixo.";
   el("dirVVisao").textContent = dir.visao || "Ainda sem visão definida.";
+  el("dirVSonho").textContent = dir.objetivo_lp || "Ainda sem sonho grande definido.";
+  el("dirVCompetencia").textContent = dir.competencia || "o que a sua rede faz que os concorrentes não replicam — defina no editor.";
   var vals = (dir.valores || "").split(/\n|;|,/).map(function(v){ return v.trim(); }).filter(Boolean);
   el("dirVValores").innerHTML = vals.length
     ? vals.map(function(v){ return '<span class="chipval">'+v+'</span>'; }).join("")
     : '<span class="hint">Ainda sem valores definidos.</span>';
+  renderStepper();
+  renderCiclo();
 }
 function firstUnanswered(){
   for(var i=0;i<descQ.length;i++){ if(!(descR[descQ[i].k]||"").trim()) return i; }
@@ -1242,15 +1556,19 @@ function editorLoja(l, anchor){
     {k:"municipio", label:"Município", cls:"w-lg", value:l?(l.municipio||""):"", ph:"ex.: Campinas"},
     {k:"uf", label:"UF", cls:"w-sm", value:l?(l.uf||""):"", ph:"SP"},
     {k:"area", label:"Área m²", cls:"w-sm", type:"number", value:l&&l.area_vendas_m2!=null?l.area_vendas_m2:""},
+    {k:"lat", label:"Latitude", cls:"w-sm", type:"number", value:l&&l.lat!=null?l.lat:"", ph:"-23.54"},
+    {k:"lng", label:"Longitude", cls:"w-sm", type:"number", value:l&&l.lng!=null?l.lng:"", ph:"-46.64"},
   ], async function(i){
     if(!i.codigo.value.trim() || !i.nome.value.trim()) throw new Error("Código e nome são obrigatórios.");
     var body = {codigo:i.codigo.value.trim(), nome:i.nome.value.trim(),
       formato:i.formato.value||null, endereco:i.endereco.value.trim()||null,
       municipio:i.municipio.value.trim()||null, uf:i.uf.value.trim()||null,
-      area_vendas_m2:i.area.value!==""?+i.area.value:null};
+      area_vendas_m2:i.area.value!==""?+i.area.value:null,
+      lat:i.lat.value!==""?+i.lat.value:null, lng:i.lng.value!==""?+i.lng.value:null};
     if(l) await jsend("PUT","/lojas/"+l.id, body);
     else await jsend("POST","/lojas", body);
-    refreshLojas();
+    await refreshLojas();
+    if(TAB==="config") renderRede();
   }, l?"Salvar":"Cadastrar");
 }
 
@@ -1399,16 +1717,20 @@ function editorAcao(a, anchor){
     {k:"quanto", label:"Quanto (R$)", cls:"w-sm", type:"number", value:a&&a.quanto!=null?a.quanto:""},
     {k:"status", label:"Status", type:"select", value:a?a.status:"planejada",
       options:[["planejada","Planejada"],["em_andamento","Em andamento"],["concluida","Concluída"],["cancelada","Cancelada"]]},
+    {k:"iniciativa_id", label:"Iniciativa", type:"select", value:a?(a.iniciativa_id||""):"",
+      options:[["","— avulsa —"]].concat(INIS.map(function(x){ return [x.id, x.nome]; }))},
   ], async function(i){
     if(!i.oque.value.trim()) throw new Error("Descreva a ação (O quê).");
     var body = {oque:i.oque.value.trim(), porque:i.porque.value.trim()||null,
       onde:i.onde.value.trim()||null, quando:i.quando.value||null,
       quem:i.quem.value.trim()||null, como:i.como.value.trim()||null,
       quanto:i.quanto.value!=="" ? +i.quanto.value : null,
-      status:i.status.value, objetivo_id:a?a.objetivo_id:null};
+      status:i.status.value, objetivo_id:a?a.objetivo_id:null,
+      iniciativa_id:i.iniciativa_id.value||null};
     if(a) await jsend("PUT","/acoes/"+a.id, body);
     else await jsend("POST","/acoes", body);
     refreshAcoes();
+    try{ var r2 = await jget("/iniciativas"); INIS = r2.iniciativas || []; renderTatico(); renderIniHome(); }catch(_){}
   }, a?"Salvar":"Criar");
 }
 
@@ -1443,30 +1765,7 @@ async function renderChecklist(){
 var alertCache = [];
 function renderAlertas(itens){
   alertCache = itens || [];
-  var nVerm = alertCache.filter(function(a){return a.sev==="r";}).length;
-  el("alertSub").textContent = alertCache.length ? nVerm + " no vermelho" : "";
-  var box = el("alertas");
-  if(!alertCache.length){
-    box.innerHTML = '<span class="hint">Nenhum desvio crítico no momento. 👍</span>';
-  } else {
-    box.innerHTML = alertCache.map(function(a, i){
-      return '<div class="alert '+a.sev+'"><div class="ic">'+(a.sev==="r"?"▲":"◆")+'</div>'+
-        '<div class="tx"><b>'+a.titulo+'</b>'+a.detalhe+'</div>'+
-        '<button class="ib" data-alert="'+i+'" title="Abrir plano de ação">→ Plano de ação</button></div>';
-    }).join("");
-  }
-  // espelho na tela Início, com link de ação inline que navega à tela relevante
-  var top = alertCache.slice(0, 4);
-  el("atencaoCard").classList.toggle("hide", !top.length);
-  el("atencaoSub").textContent = top.length ? alertCache.length + " desvio(s)" : "";
-  el("atencaoHome").innerHTML = top.map(function(a, i){
-    var act = (a.kpi==="venda_loja" && a.loja_id)
-        ? ' <button class="linklike" data-anav="loja" data-ai="'+i+'">abrir loja →</button>'
-      : a.kpi==="okr" ? ' <button class="linklike" data-anav="plano">ver metas →</button>'
-      : ' <button class="linklike" data-anav="advisor">ver análise →</button>';
-    return '<div class="alert '+a.sev+'"><div class="ic">'+(a.sev==="r"?"▲":"◆")+'</div>'+
-      '<div class="tx"><b>'+a.titulo+'</b>'+a.detalhe+act+'</div></div>';
-  }).join("");
+  renderRiscos();
 }
 
 var fcaCache = [];
@@ -1477,24 +1776,36 @@ async function refreshFca(){
 }
 
 var FCA_ST = {aberto:"Aberto", em_andamento:"Em andamento", resolvido:"Resolvido", descartado:"Descartado"};
+var FCA_V2 = {aberto:{txt:"AGUARDANDO APROVAÇÃO", cls:"pr"},
+  em_andamento:{txt:"AÇÃO EM CURSO", cls:"pa"},
+  resolvido:{txt:"RESOLVIDO · APRENDIZADO", cls:"pg"},
+  descartado:{txt:"DESCARTADO", cls:"hint"}};
 function renderFca(ciclos){
   fcaCache = ciclos || [];
   var box = el("fca");
   if(!fcaCache.length){
-    box.innerHTML = '<span class="hint">Nenhum plano de ação. Crie um a partir de um alerta ou pelo botão ＋ Plano.</span>'; return;
+    box.innerHTML = '<span class="hint">Nenhum desvio registrado. Registre um FCA a partir de um insight do Advisor ou pelo botão acima.</span>'; return;
   }
   box.innerHTML = fcaCache.map(function(c, i){
-    var chip = '<span class="chipst st-'+c.status+'">'+(FCA_ST[c.status]||c.status)+'</span>';
+    var st = FCA_V2[c.status] || {txt:c.status, cls:"pa"};
     var acts = '<span class="obj-actions">'+
       '<button class="ib" data-fact="e" data-fi="'+i+'" title="Editar">✎</button>'+
       '<button class="ib danger" data-fact="x" data-fi="'+i+'" title="Excluir">×</button></span>';
-    var rows = [["Fato",c.fato],["Causa",c.causa],["Ação",c.acao],
-      ["Quem",c.responsavel && c.prazo ? c.responsavel+" · até "+c.prazo : (c.responsavel||c.prazo)],
-      ["Resultado",c.resultado]]
+    var rows = [["Fato",c.fato],["Causa",c.causa],["Ação",c.acao],["Resultado",c.resultado]]
       .filter(function(r){return r[1];})
-      .map(function(r){return '<span class="k">'+r[0]+'</span><span>'+r[1]+'</span>';}).join("");
-    return '<div class="fca-item"><h3>'+c.titulo+chip+acts+'</h3>'+
-           (rows?'<div class="fca-grid">'+rows+'</div>':'')+'</div>';
+      .map(function(r){
+        return '<div class="fca-row"><span class="fca-k">'+r[0]+'</span><span style="color:var(--ink-2)">'+r[1]+'</span></div>';
+      }).join("");
+    return '<div class="insight"><div class="ai">✦</div>'
+      + '<div style="display:flex;flex-direction:column;gap:8px;font-size:12.5px;flex:1;min-width:0">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><b style="font-size:13.5px">'+c.titulo+acts+'</b>'
+      + '<span class="'+st.cls+'" style="font-weight:700;font-size:11px;white-space:nowrap">● '+st.txt+'</span></div>'
+      + rows
+      + '<div style="display:flex;gap:14px;color:var(--faint);font-size:11.5px;flex-wrap:wrap">'
+      + '<span>dono: <b style="color:var(--muted)">'+(c.responsavel||"—")+'</b></span>'
+      + '<span>prazo: <b style="color:var(--muted)">'+(c.prazo||"—")+'</b></span>'
+      + '<span>origem: '+(c.origem||"manual")+'</span></div>'
+      + '</div></div>';
   }).join("");
 }
 
@@ -1657,69 +1968,265 @@ function indVoltar(){
 }
 
 var okrCache = [];
-function renderMensal(km){
-  var svg = el("mensalChart");
-  while(svg.firstChild) svg.removeChild(svg.firstChild);
-  if(!km || !km.meses || !km.meses.length){
-    el("mensalSub").textContent = ""; el("mensalNota").textContent = "Sem histórico suficiente ainda."; return;
+// ===================== tela Evolução (12m + atual + 6m) =====================
+var EVO = null, EVO_METRICA = "faturamento", FERIADOS = [];
+var EVO_DEFS = {
+  faturamento: {label:"Faturamento", titulo:"Faturamento mensal", sub:"R$ mil \u00b7 tra\u00e7o escuro = meta do m\u00eas (ano anterior \u00d7 meta anual)", fmt:function(v){return brl(v);},
+    val:function(m){return m.tipo==="fechado"?m.realizado:(m.tipo==="corrente"?m.realizado:m.previsto);}, temProj:true, temMeta:true},
+  volume: {label:"Volume", titulo:"Volume de vendas", sub:"itens vendidos no m\u00eas", fmt:function(v){return (v/1000).toLocaleString("pt-BR",{maximumFractionDigits:0})+" mil";},
+    val:function(m){return m.itens!=null?m.itens:null;}, temProj:false, temMeta:false},
+  ticket: {label:"Ticket", titulo:"Ticket m\u00e9dio", sub:"R$ por cupom no m\u00eas", fmt:function(v){return "R$ "+v.toFixed(2);},
+    val:function(m){return (m.cupons&&m.realizado!=null)?m.realizado/m.cupons:null;}, temProj:false, temMeta:false},
+  margem: {label:"Margem", titulo:"Margem bruta", sub:"% sobre a venda", fmt:function(v){return v.toFixed(1)+"%";},
+    val:function(m){return (m.margem&&m.realizado&&m.margem<m.realizado)?m.margem/m.realizado*100:null;}, temProj:false, temMeta:false}
+};
+var EVO_SEM_DADO = [["clientes","Clientes \u00fanicos"],["visita","Visita m\u00e9dia"],["perdas","Perdas"],["ruptura","Ruptura"]];
+async function loadEvolucao(){
+  if(!EVO){
+    try{ EVO = await jget("/kpi/mensal?fut=6"); }catch(_){ EVO = {meses:[]}; }
+    try{ var fr = await jget("/feriados"); FERIADOS = fr.feriados || []; }catch(_){ FERIADOS = []; }
+    montarEvoSeg();
+    renderIdx();
+    renderSparks();
+    renderTendencias();
   }
+  renderEvoBars();
+  if(last) drawChart();
+}
+function montarEvoSeg(){
+  var seg = el("evoSeg");
+  seg.innerHTML = Object.keys(EVO_DEFS).map(function(k){
+    return '<button data-m="'+k+'"'+(k===EVO_METRICA?' class="on"':'')+'>'+EVO_DEFS[k].label+'</button>';
+  }).join("") + EVO_SEM_DADO.map(function(x){
+    return '<button disabled title="requer dados que ainda n\u00e3o est\u00e3o integrados" style="opacity:.45;cursor:not-allowed">'+x[1]+'</button>';
+  }).join("");
+}
+function renderEvoBars(){
+  var D = EVO_DEFS[EVO_METRICA];
+  var ms = (EVO && EVO.meses) || [];
+  el("evoTitulo").textContent = D.titulo + " \u2014 \u00faltimos 12 meses \u00b7 atual \u00b7 pr\u00f3ximos 6";
+  el("evoSub").textContent = D.sub + (EVO && EVO.ancora ? " \u00b7 dados at\u00e9 "+EVO.ancora : "");
+  var box = el("evoChart"), lbl = el("evoLabels");
+  if(!ms.length){ box.innerHTML = '<span class="hint">Sem hist\u00f3rico suficiente ainda.</span>'; lbl.innerHTML=""; return; }
+  var use = ms.filter(function(m){ return D.temProj || m.tipo!=="previsto"; });
+  var vals = use.map(function(m){
+    if(m.tipo==="previsto") return m.previsto;
+    if(EVO_METRICA==="faturamento") return m.tipo==="corrente" ? m.projetado : m.realizado;
+    return D.val(m);
+  });
+  var metas = use.map(function(m){ return D.temMeta ? m.meta : null; });
+  var max = 0;
+  vals.concat(metas).forEach(function(v){ if(v!=null && v>max) max=v; });
+  if(!max){ box.innerHTML = '<span class="hint">Esta m\u00e9trica precisa de dados que a importa\u00e7\u00e3o atual n\u00e3o tem (ex.: cupons/custo).</span>'; lbl.innerHTML=""; return; }
+  max *= 1.1;
+  var H = 190;
+  function px(v){ return Math.max(1, Math.round(v/max*H)); }
+  var idxHoje = use.map(function(m){return m.tipo;}).indexOf("corrente");
+  var listras = "repeating-linear-gradient(45deg,color-mix(in srgb,var(--accent) 38%,transparent) 0 3px,color-mix(in srgb,var(--accent) 12%,transparent) 3px 6px)";
+  var evMap = {};
+  FERIADOS.forEach(function(f){
+    if(f.tipo === "sazonal" || /natal|p\u00e1scoa|pascoa/i.test(f.nome)) evMap[f.data.slice(0,7)] = f.nome.split(" ")[0];
+  });
+  var grid = [0.25,0.5,0.75].map(function(g){
+    var v = max*g;
+    return '<div style="position:absolute;left:0;right:0;bottom:'+Math.round(H*g)+'px;border-top:1px solid var(--grid)">'
+      + '<span style="position:absolute;left:0;top:-16px;font-size:10px;color:var(--faint)" class="num">'+D.fmt(v)+'</span></div>';
+  }).join("");
+  var hoje = idxHoje>=0
+    ? '<div style="position:absolute;top:-6px;bottom:0;left:'+((idxHoje+0.9)/use.length*100).toFixed(1)+'%;border-left:1px dashed var(--border-strong,var(--border))"><span style="position:absolute;top:-14px;left:-14px;font-size:10px;font-weight:700;color:var(--accent-strong)">hoje</span></div>'
+    : "";
+  var barras = '<div style="display:flex;gap:6px;align-items:flex-end;height:'+H+'px;position:relative">'
+    + use.map(function(m, i){
+      var v = vals[i];
+      var extra = "";
+      var bar;
+      if(v==null){ bar = '<div style="width:62%;height:1px"></div>'; }
+      else if(m.tipo==="previsto"){
+        bar = '<div style="width:62%;height:'+px(v)+'px;border-radius:4px 4px 0 0;background:'+listras+';border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);box-sizing:border-box"></div>';
+      } else if(m.tipo==="corrente" && EVO_METRICA==="faturamento" && m.previsto_restante>0){
+        extra = '<div style="width:62%;height:'+px(m.projetado-m.realizado)+'px;background:'+listras+';border:1px solid color-mix(in srgb,var(--accent) 40%,transparent);border-bottom:none;border-radius:4px 4px 0 0;box-sizing:border-box"></div>';
+        bar = '<div style="width:62%;height:'+px(m.realizado)+'px;background:var(--accent-strong)"></div>';
+      } else {
+        bar = '<div style="width:62%;height:'+px(v)+'px;border-radius:4px 4px 0 0;background:'+(m.tipo==="corrente"?"var(--accent-strong)":"color-mix(in srgb,var(--accent) 50%,transparent)")+'"></div>';
+      }
+      var tick = (metas[i]!=null)
+        ? '<div style="position:absolute;left:11%;right:11%;bottom:'+px(metas[i])+'px;border-top:2px dashed var(--ink-2);opacity:.8"></div>' : "";
+      var tt = m.mes + " \u2014 " + (v!=null ? D.fmt(v) : "\u2014") + (metas[i]!=null ? " \u00b7 meta "+D.fmt(metas[i]) : "");
+      return '<div title="'+tt+'" style="flex:1;min-width:0;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">'+extra+bar+tick+'</div>';
+    }).join("") + '</div>';
+  box.innerHTML = '<div style="position:relative">'+grid+hoje+barras+'</div>';
+  var MESN = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  lbl.innerHTML = use.map(function(m, i){
+    var mm = MESN[+m.mes.slice(5,7)-1] + (m.mes.slice(5,7)==="01" || i===0 ? "/"+m.mes.slice(2,4) : "");
+    var ev = m.tipo==="corrente" ? "hoje" : (evMap[m.mes] || "");
+    var evCor = m.tipo==="corrente" ? "var(--accent-strong)" : "var(--warn)";
+    return '<div style="flex:1;min-width:0;text-align:center">'
+      + '<div style="font-size:10px;font-weight:'+(m.tipo==="corrente"?700:500)+';color:'+(m.tipo==="corrente"?"var(--accent-strong)":"var(--faint)")+';white-space:nowrap">'+mm+'</div>'
+      + '<div style="font-size:9.5px;font-weight:700;color:'+evCor+';height:13px;white-space:nowrap">'+ev+'</div></div>';
+  }).join("");
+}
+function renderIdx(){
+  var svg = el("idxChart"); while(svg.firstChild) svg.removeChild(svg.firstChild);
+  var ms = ((EVO && EVO.meses) || []).filter(function(m){ return m.tipo!=="previsto"; });
+  var pts = ms.map(function(m){
+    var preco = (m.itens && m.realizado) ? m.realizado/m.itens : null;
+    var custo = (m.itens && m.margem!=null && m.realizado && m.margem<m.realizado)
+      ? (m.realizado-m.margem)/m.itens : null;
+    return {mes:m.mes, tipo:m.tipo, preco:preco, custo:custo};
+  }).filter(function(p){ return p.preco!=null; });
+  if(pts.length < 4){
+    el("idxChips").innerHTML = '<span class="hint">S\u00e9rie de pre\u00e7o/custo indispon\u00edvel \u2014 requer itens e custo nos dados importados.</span>';
+    return;
+  }
+  var b = pts[0];
   var ns = "http://www.w3.org/2000/svg";
   function mk(t,a){ var e=document.createElementNS(ns,t); for(var k in a) e.setAttribute(k,a[k]); return e; }
-  var cs = getComputedStyle(document.body);
-  var Cac = cs.getPropertyValue("--accent").trim(), Cwarn = cs.getPropertyValue("--warn").trim(),
-      Cgr = cs.getPropertyValue("--grid").trim(), Cmu = cs.getPropertyValue("--muted").trim();
-  var ms = km.meses;
-  var vals = ms.map(function(m){
-    return m.tipo==="fechado" ? m.realizado : (m.tipo==="corrente" ? m.projetado : m.previsto);
+  var idx = pts.map(function(p){
+    return {mes:p.mes, tipo:p.tipo, preco:p.preco/b.preco*100, custo:p.custo!=null&&b.custo?p.custo/b.custo*100:null};
   });
-  var metas = ms.map(function(m){ return m.meta; });
-  var max = Math.max.apply(null, vals.concat(metas.filter(function(v){return v!=null;}), [1])) * 1.12;
-  var W=720, H=240, P={l:8,r:8,t:10,b:26};
-  var iw = W-P.l-P.r, ih = H-P.t-P.b;
-  var n = ms.length, bw = iw/n*0.62, step = iw/n;
-  function Y(v){ return P.t + ih - (v/max)*ih; }
-  for(var g=1; g<=3; g++){
-    var gy = P.t + ih*g/4;
-    svg.appendChild(mk("line",{x1:P.l,y1:gy,x2:W-P.r,y2:gy,stroke:Cgr,"stroke-width":1}));
+  var all = [];
+  idx.forEach(function(p){ all.push(p.preco); if(p.custo!=null) all.push(p.custo); });
+  var lo = Math.min.apply(null, all), hi = Math.max.apply(null, all);
+  var pad = (hi-lo)*0.15 || 2;
+  function X(i){ return 14 + i*(692/Math.max(1, idx.length-1)); }
+  function Y(v){ return 180 - (v-(lo-pad))/((hi+pad)-(lo-pad))*160; }
+  [lo, (lo+hi)/2, hi].forEach(function(g){
+    svg.appendChild(mk("line",{x1:14,y1:Y(g),x2:706,y2:Y(g),stroke:"var(--grid)"}));
+    var t = mk("text",{x:14,y:Y(g)-4,"font-size":9.5,fill:"var(--faint)"}); t.textContent = g.toFixed(0); svg.appendChild(t);
+  });
+  function poly(key, corr, dash){
+    var solid = idx.filter(function(p){return p.tipo==="fechado";});
+    var d1 = solid.map(function(p,i){ return X(i)+","+Y(p[key]); }).join(" ");
+    svg.appendChild(mk("polyline",{points:d1,fill:"none",stroke:corr,"stroke-width":2.2,"stroke-linejoin":"round"}));
+    if(idx.length > solid.length){
+      var lastI = solid.length-1;
+      var d2 = [X(lastI)+","+Y(solid[lastI][key])].concat(
+        idx.slice(solid.length).map(function(p,k){ return X(lastI+1+k)+","+Y(p[key]); })).join(" ");
+      svg.appendChild(mk("polyline",{points:d2,fill:"none",stroke:corr,"stroke-width":1.8,"stroke-dasharray":"4 3",opacity:.7}));
+    }
   }
-  var MESN = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
-  ms.forEach(function(m, i){
-    var x = P.l + step*i + (step-bw)/2;
-    var titulo = m.mes + " — " + (m.tipo==="corrente"
-      ? "realizado "+brl(m.realizado)+" + projeção "+brl(m.previsto_restante)+" = "+brl(m.projetado)
-      : (m.tipo==="previsto" ? "previsto "+brl(m.previsto) : "realizado "+brl(m.realizado)))
-      + (m.meta!=null ? " · programado "+brl(m.meta) : "");
-    var grupo = mk("g",{});
-    var tEl = mk("title",{}); tEl.textContent = titulo; grupo.appendChild(tEl);
-    if(m.tipo==="fechado"){
-      grupo.appendChild(mk("rect",{x:x,y:Y(m.realizado),width:bw,height:Math.max(1,P.t+ih-Y(m.realizado)),fill:Cac,rx:3}));
-    } else if(m.tipo==="corrente"){
-      grupo.appendChild(mk("rect",{x:x,y:Y(m.realizado),width:bw,height:Math.max(1,P.t+ih-Y(m.realizado)),fill:Cac,rx:3}));
-      if(m.previsto_restante>0){
-        grupo.appendChild(mk("rect",{x:x,y:Y(m.projetado),width:bw,
-          height:Math.max(1,Y(m.realizado)-Y(m.projetado)),fill:Cac,opacity:.45,rx:3}));
-      }
-    } else {
-      grupo.appendChild(mk("rect",{x:x,y:Y(m.previsto),width:bw,height:Math.max(1,P.t+ih-Y(m.previsto)),
-        fill:"none",stroke:Cac,"stroke-width":2,"stroke-dasharray":"4 3",rx:3,opacity:.8}));
+  if(idx.some(function(p){return p.custo!=null;})) poly("custo","var(--crit)");
+  poly("preco","var(--accent)");
+  var pAcum = idx[idx.length-1].preco - 100;
+  var cAcum = idx[idx.length-1].custo!=null ? idx[idx.length-1].custo - 100 : null;
+  var chips = '<span class="chip g" style="background:var(--accent-soft);color:var(--accent-strong)">Pre\u00e7o m\u00e9dio na janela: <b class="num">'+(pAcum>=0?"+":"")+pAcum.toFixed(1)+'%</b></span>';
+  if(cAcum!=null){
+    chips += '<span class="chip r">Custo m\u00e9dio: <b class="num">'+(cAcum>=0?"+":"")+cAcum.toFixed(1)+'%</b></span>';
+    var gap = cAcum - pAcum;
+    if(Math.abs(gap) >= 0.3){
+      chips += '<span style="color:var(--muted)">\u2192 o custo '+(gap>0?"sobe <b class=\'pr\'>":"sobe <b class=\'pg\'>")+Math.abs(gap).toFixed(1)+"pp "+(gap>0?"acima":"abaixo")+"</b> do repasse ao pre\u00e7o.</span>";
     }
-    if(m.meta!=null){
-      grupo.appendChild(mk("line",{x1:x-2,y1:Y(m.meta),x2:x+bw+2,y2:Y(m.meta),
-        stroke:Cwarn,"stroke-width":3,"stroke-linecap":"round"}));
+  }
+  el("idxChips").innerHTML = chips;
+}
+function krAlvo(regex){
+  for(var i=0;i<okrCache.length;i++){
+    var ks = okrCache[i].krs||[];
+    for(var j=0;j<ks.length;j++){ if(regex.test(ks[j].titulo||"")) return ks[j]; }
+  }
+  return null;
+}
+function sparkCard(nome, sub, serie, alvo, fmt, invert){
+  if(!serie.length) return '<section class="card" style="padding:16px"><b style="font-size:13.5px">'+nome+'</b><div class="hint" style="margin-top:8px">'+sub+'</div></section>';
+  var all = serie.concat(alvo!=null?[alvo]:[]);
+  var lo = Math.min.apply(null,all), hi = Math.max.apply(null,all), pad=(hi-lo)*0.12||1;
+  function y(v){ return (84 - (v-(lo-pad))/((hi+pad)-(lo-pad))*68).toFixed(1); }
+  function x(i){ return (8 + i*304/Math.max(1,serie.length-1)).toFixed(1); }
+  var pts = serie.map(function(v,i){ return x(i)+","+y(v); }).join(" ");
+  var fim = serie[serie.length-1];
+  var farol = alvo==null ? null : (invert ? (fim<=alvo) : (fim>=alvo)) ? {c:"pg",t:"no ritmo"}
+    : (Math.abs(fim-alvo) <= (hi-lo)*0.25 ? {c:"pa",t:"aten\u00e7\u00e3o"} : {c:"pr",t:"em risco"});
+  return '<section class="card" style="padding:0;overflow:hidden">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 16px;border-bottom:1px solid var(--border)">'
+    + '<div><b style="font-size:13.5px">'+nome+'</b><div style="color:var(--faint);font-size:11px;font-weight:500">'+sub+'</div></div>'
+    + (farol?'<span class="'+farol.c+'" style="display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;text-transform:uppercase;white-space:nowrap"><span class="led '+(farol.c==="pg"?"g":farol.c==="pa"?"a":"r")+'" style="margin-left:0"></span>'+farol.t+'</span>':"")
+    + '</div><div style="padding:12px 16px 6px"><svg viewBox="0 0 320 92" style="display:block;width:100%;height:auto">'
+    + (alvo!=null?'<line x1="8" y1="'+y(alvo)+'" x2="312" y2="'+y(alvo)+'" stroke="var(--prioryr)" stroke-width="1.4" stroke-dasharray="4 3"></line><text x="312" y="'+(y(alvo)-4)+'" text-anchor="end" font-size="9.5" fill="var(--faint)" font-weight="600">alvo '+fmt(alvo)+'</text>':"")
+    + '<polyline points="'+pts+'" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linejoin="round"></polyline>'
+    + '<circle cx="'+x(serie.length-1)+'" cy="'+y(fim)+'" r="3.5" fill="var(--accent)"></circle>'
+    + '</svg></div>'
+    + '<div style="display:flex;justify-content:space-between;padding:8px 16px 13px;font-size:11.5px;color:var(--faint)">'
+    + '<span>atual <b class="num" style="color:var(--ink);font-size:12.5px">'+fmt(fim)+'</b></span>'
+    + (alvo!=null?'<span>alvo <b class="num" style="color:var(--ink-2);font-size:12.5px">'+fmt(alvo)+'</b></span>':"")
+    + '</div></section>';
+}
+function renderSparks(){
+  var ms = ((EVO && EVO.meses) || []).filter(function(m){ return m.tipo!=="previsto"; });
+  var margSerie = ms.map(function(m){ return EVO_DEFS.margem.val(m); }).filter(function(v){return v!=null;});
+  var tickSerie = ms.map(function(m){ return EVO_DEFS.ticket.val(m); }).filter(function(v){return v!=null;});
+  var krM = krAlvo(/margem/i), krT = krAlvo(/ticket/i), krR = krAlvo(/ruptura/i);
+  // KRs percentuais (fonte *_pct ou meta pequena) n\u00e3o servem de alvo em R$
+  if(krT && (/pct/.test(krT.fonte||"") || +krT.meta < 20)) krT = null;
+  el("sparksRow").innerHTML =
+    sparkCard("Margem bruta", krM?("alvo "+(+krM.meta).toLocaleString("pt-BR")+"%"):"sem KR de margem",
+      margSerie, krM?+krM.meta:null, function(v){return v.toFixed(1)+"%";}, false) +
+    sparkCard("Ticket m\u00e9dio", krT?("alvo R$ "+(+krT.meta).toFixed(2)):"evolu\u00e7\u00e3o mensal do ticket",
+      tickSerie, krT?+krT.meta:null, function(v){return "R$ "+v.toFixed(2);}, false) +
+    sparkCard("Ruptura", "requer integra\u00e7\u00e3o de estoque"+(krR?" \u00b7 alvo "+(+krR.meta)+"%":""), [], null, null, true);
+}
+function regressao(vals){
+  var n = vals.length; if(n<4) return null;
+  var sx=0, sy=0, sxy=0, sxx=0;
+  vals.forEach(function(v,i){ sx+=i; sy+=v; sxy+=i*v; sxx+=i*i; });
+  var slope = (n*sxy - sx*sy)/(n*sxx - sx*sx);
+  var media = sy/n;
+  return media ? slope*(n-1)/media : null;   // variação % ao longo da janela
+}
+async function renderTendencias(){
+  var box = el("tendGrid");
+  try{
+    var hoje = EVO && EVO.ancora ? new Date(EVO.ancora) : new Date();
+    var de = new Date(hoje.getTime() - 83*86400000);
+    function iso(d){ return d.toISOString().slice(0,10); }
+    var r = await jget("/kpi/diario?data_de="+iso(de)+"&data_ate="+iso(hoje));
+    var dias = r.dias || [];
+    // agrega por semana (7 dias) e mede a inclinação
+    var sem = [];
+    for(var i=0;i<dias.length;i+=7){
+      var w = dias.slice(i,i+7);
+      if(w.length<7) break;
+      var fat=0, itn=0, cup=0, mrg=0;
+      w.forEach(function(d){ fat+=+d.faturamento_liq; itn+=+(d.itens||0); cup+=+(d.cupons||0); mrg+=+(d.margem||0); });
+      sem.push({fat:fat, vol:itn, tick:cup?fat/cup:null, marg:(mrg>0&&mrg<fat)?mrg/fat*100:null});
     }
-    svg.appendChild(grupo);
-    var lb = mk("text",{x:x+bw/2,y:H-10,"text-anchor":"middle",fill:Cmu,"font-size":8.5});
-    lb.textContent = MESN[+m.mes.slice(5,7)-1]+"/"+m.mes.slice(2,4);
-    svg.appendChild(lb);
-  });
-  var corrente = ms.filter(function(m){return m.tipo==="corrente";})[0];
-  el("mensalSub").textContent = "até " + (km.ancora||"");
-  el("mensalNota").textContent = corrente
-    ? ("Mês corrente ("+corrente.mes+"): realizado "+brl(corrente.realizado)+
-       (corrente.previsto_restante>0 ? " + projeção "+brl(corrente.previsto_restante)+" → tendência "+brl(corrente.projetado) : "")+
-       (corrente.meta!=null ? " · programado "+brl(corrente.meta) : "")+
-       ". A projeção se corrige a cada dia de venda.")
-    : "";
+    function serie(k){ return sem.map(function(s){return s[k];}).filter(function(v){return v!=null;}); }
+    var defs = [
+      ["Faturamento \u00b7 rede", serie("fat"), false],
+      ["Volume \u00b7 rede", serie("vol"), false],
+      ["Ticket m\u00e9dio \u00b7 rede", serie("tick"), false],
+      ["Margem bruta \u00b7 rede", serie("marg"), false]
+    ];
+    var cards = [];
+    defs.forEach(function(d){
+      var t = regressao(d[1]);
+      if(t==null) return;
+      var pctT = t*100;
+      var seta = pctT > 1.5 ? "\u2197" : pctT < -1.5 ? "\u2198" : "\u2192";
+      var cls = pctT > 1.5 ? "pg" : pctT < -1.5 ? "pr" : "";
+      var fundo = pctT > 1.5 ? "var(--good-soft)" : pctT < -1.5 ? "var(--crit-soft)" : "var(--surface-2)";
+      var cor = pctT > 1.5 ? "var(--good)" : pctT < -1.5 ? "var(--crit)" : "var(--muted)";
+      var acao = pctT < -3 ? "\u25b2 cr\u00edtico \u2014 registrar FCA e investigar"
+        : pctT < -1.5 ? "\u25c6 aten\u00e7\u00e3o \u2014 acompanhar na semanal"
+        : pctT > 1.5 ? "\u25cf saud\u00e1vel \u2014 manter e medir" : "\u25cb est\u00e1vel";
+      cards.push('<div style="border:1px solid var(--border);border-radius:12px;padding:13px 14px;display:flex;gap:12px;align-items:flex-start;background:var(--surface-2)">'
+        + '<div style="width:34px;height:34px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:17px;font-weight:700;color:'+cor+';background:'+fundo+'">'+seta+'</div>'
+        + '<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px"><b style="font-size:13px">'+d[0]+'</b>'
+        + '<span class="num '+cls+'" style="font-weight:700;font-size:12px;white-space:nowrap">'+(pctT>=0?"+":"")+pctT.toFixed(1)+'% / '+sem.length+' sem</span></div>'
+        + '<div style="font-size:12px;color:var(--muted);margin-top:2px">Inclina\u00e7\u00e3o da regress\u00e3o linear sobre as \u00faltimas '+sem.length+' semanas de venda di\u00e1ria.</div>'
+        + '<div style="margin-top:7px"><span style="font-size:11px;font-weight:600;color:'+cor+'">'+acao+'</span></div></div></div>');
+    });
+    box.innerHTML = cards.join("") || '<span class="hint">S\u00e9rie curta demais para detectar tend\u00eancias (m\u00ednimo ~4 semanas).</span>';
+    // leitura da trajetória
+    var leituras = [];
+    var fatT = regressao(serie("fat"));
+    if(fatT!=null) leituras.push("<span><b>Faturamento:</b> inclina\u00e7\u00e3o de "+(fatT*100>=0?"+":"")+(fatT*100).toFixed(1)+"% nas \u00faltimas "+sem.length+" semanas"+(fatT<-0.015?" \u2014 vale abrir um FCA para investigar a causa.":".")+"</span>");
+    var krM = krAlvo(/margem/i);
+    var margSerie = serie("marg");
+    if(krM && margSerie.length) leituras.push("<span><b>Margem:</b> \u00faltima semana em "+margSerie[margSerie.length-1].toFixed(1)+"% contra alvo de "+(+krM.meta).toLocaleString("pt-BR")+"% \u2014 "+(margSerie[margSerie.length-1]>=+krM.meta?"no alvo.":"ainda abaixo; as a\u00e7\u00f5es de margem do plano t\u00e1tico s\u00e3o o caminho.")+"</span>");
+    el("evoLeitura").innerHTML = leituras.join("") || "\u2014";
+  }catch(e){
+    box.innerHTML = '<span class="hint">N\u00e3o foi poss\u00edvel calcular: '+e.message+'</span>';
+  }
 }
 
 function objStatus(o){
@@ -1736,17 +2243,20 @@ function objProgresso(o){
 }
 function renderOkrs(objetivos){
   okrCache = objetivos || [];
-  // card "Metas do ano" do Início: barra por objetivo, como no protótipo
-  el("okrsHome").innerHTML = !okrCache.length
-    ? '<span class="hint">Sem metas cadastradas ainda.</span>'
-    : okrCache.slice(0,3).map(function(o){
+  // Painel v2: dashboard semáforo — objetivo · status ● · barra+% · dono · próxima ação
+  el("semaforoTitulo").textContent = "OKRs " + el("ano").value + " — dashboard semáforo";
+  el("okrSemaforo").innerHTML = !okrCache.length
+    ? '<span class="hint" style="display:block;padding:14px 17px">Sem metas cadastradas ainda.</span>'
+    : okrCache.map(function(o){
         var p = objProgresso(o), st = objStatus(o);
         var fill = st.cls==="pg"?"bg":st.cls==="pa"?"ba":"br";
-        return '<div style="display:flex;flex-direction:column;gap:7px;margin-bottom:15px">'+
-          '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">'+
-          '<span style="font-weight:600;font-size:13.5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+o.titulo+'</span>'+
-          '<b class="num" style="font-size:13px;flex:none">'+Math.round(p*100)+'%</b></div>'+
-          '<div class="bar"><span class="'+fill+'" style="width:'+(p*100)+'%"></span></div></div>';
+        var stTxt = st.txt==="EM RISCO"?"EM RISCO":st.txt;
+        return '<div class="grow" style="grid-template-columns:1.7fr .9fr 1.1fr .8fr 1.4fr;align-items:center;font-size:12.5px">'+
+          '<span style="font-weight:600">'+o.titulo+'</span>'+
+          '<span class="'+st.cls+'" style="font-weight:700;font-size:11px">● '+stTxt+'</span>'+
+          '<span style="display:flex;align-items:center;gap:8px"><span class="bar" style="flex:1"><span class="'+fill+'" style="width:'+(p*100)+'%"></span></span><b class="num" style="font-size:12px">'+Math.round(p*100)+'%</b></span>'+
+          '<span style="color:var(--muted)">'+(o.owner||"—")+'</span>'+
+          '<span style="color:var(--ink-2)">'+proximaAcaoDoObjetivo(o.id)+'</span></div>';
       }).join("");
   var box = el("okrs");
   el("okrsSub").textContent = okrCache.length ? okrCache.length+" objetivo(s)" : "";
@@ -1864,10 +2374,14 @@ function showLogin(msg){
   el("sidebar").classList.add("hide");
   el("plano").classList.add("hide");
   el("conselho").classList.add("hide");
+  el("evolucao").classList.add("hide");
+  el("execucao").classList.add("hide");
+  el("salaconselho").classList.add("hide");
   el("indicadores").classList.add("hide");
   el("config").classList.add("hide");
   el("admin").classList.add("hide");
   el("tabAdmin").classList.add("hide");
+  el("cicloCard").classList.add("hide");
   planoCarregado = false; TAB = "hoje";
   Array.prototype.forEach.call(document.querySelectorAll("#tabs .tab"), function(b){
     b.classList.toggle("on", b.getAttribute("data-tab") === "hoje");
@@ -1947,10 +2461,6 @@ el("senha").addEventListener("keydown", function(e){ if(e.key==="Enter") entrar(
 el("logout").addEventListener("click", function(){ el("empresa").classList.add("hide"); logout(); });
 el("load").addEventListener("click", load);
 el("empresa").addEventListener("change", function(){ if(el("empresa").value) load(); });
-el("planSeg").addEventListener("click", function(e){
-  var b = e.target.closest("button[data-pt]"); if(!b) return;
-  showPlanTab(b.getAttribute("data-pt"));
-});
 el("cfgSeg").addEventListener("click", function(e){
   var b = e.target.closest("button[data-ct]"); if(!b) return;
   showCfgTab(b.getAttribute("data-ct"));
@@ -2015,7 +2525,12 @@ el("dirSalvar").addEventListener("click", async function(){
   try{
     await jsend("PUT","/direcao",{proposito:el("dirProposito").value.trim()||null,
       visao:el("dirVisao").value.trim()||null, valores:el("dirValores").value.trim()||null,
-      objetivo_lp:el("dirObjetivo").value.trim()||null});
+      objetivo_lp:el("dirObjetivo").value.trim()||null,
+      competencia:el("dirCompetencia").value.trim()||null});
+    DIRECAO = {proposito:el("dirProposito").value.trim(), visao:el("dirVisao").value.trim(),
+      valores:el("dirValores").value.trim(), objetivo_lp:el("dirObjetivo").value.trim(),
+      competencia:el("dirCompetencia").value.trim()};
+    renderDirecaoView(DIRECAO); renderPainelDirecao(DIRECAO);
     el("dirSalvar").textContent = "Salvo ✓";
     setTimeout(function(){ el("dirSalvar").textContent = "Salvar"; }, 1500);
   }catch(e){ window.alert("Não foi possível salvar: "+e.message); }
@@ -2173,14 +2688,10 @@ el("usersTbl").addEventListener("click", function(e){
       .catch(function(err){ window.alert("Não foi possível excluir: "+err.message); });
   }
 });
-el("alertas").addEventListener("click", function(e){
-  var b = e.target.closest("button[data-alert]"); if(!b) return;
-  alertaParaFca(+b.getAttribute("data-alert"));
-});
 el("fca").addEventListener("click", function(e){
   var b = e.target.closest("button.ib"); if(!b) return;
   var c = fcaCache[+b.getAttribute("data-fi")]; if(!c) return;
-  if(b.getAttribute("data-fact")==="e") editorFca(c, b.closest(".fca-item"));
+  if(b.getAttribute("data-fact")==="e") editorFca(c, b.closest(".insight"));
   else if(window.confirm("Excluir este plano de ação?")){
     jsend("DELETE","/fca/"+c.id).then(refreshFca)
       .catch(function(err){ window.alert("Não foi possível excluir: "+err.message); });
@@ -2191,7 +2702,7 @@ el("checklist").addEventListener("click", function(e){
   var alvo = b.getAttribute("data-goto");
   if(alvo === "descoberta"){ showTab("estrategia"); showPlanTab("direcao"); }
   else if(alvo === "metas"){ showTab("estrategia"); showPlanTab("metas"); }
-  else if(alvo === "iniciativas"){ showTab("config"); showCfgTab("iniciativas"); }
+  else if(alvo === "iniciativas"){ showTab("execucao"); }
   else if(alvo === "dados"){ showTab("config"); showCfgTab("dados"); }
   else showTab(alvo);
   window.scrollTo(0,0);
@@ -2219,19 +2730,493 @@ function setLens(v){
 Array.prototype.forEach.call(document.querySelectorAll("#seg button"), function(b){
   b.addEventListener("click", function(){ setLens(b.getAttribute("data-l")); });
 });
-el("okrsHomeLink").addEventListener("click", function(){ showTab("estrategia"); showPlanTab("metas"); window.scrollTo(0,0); });
-el("atencaoHome").addEventListener("click", function(ev){
-  var b = ev.target.closest ? ev.target.closest("[data-anav]") : null;
-  if(!b) return;
-  var t = b.getAttribute("data-anav");
-  if(t==="loja"){
-    var a = alertCache[+b.getAttribute("data-ai")];
-    var l = indLojasCache.filter(function(x){ return x.id===a.loja_id; })[0];
-    showTab("indicadores");
-    if(l) drillIndLoja(l);
-  } else if(t==="plano"){ showTab("estrategia"); showPlanTab("metas"); }
-  else { showTab("conselho"); }
-  window.scrollTo({top:0, behavior:"smooth"});
+// navegação cruzada dos links do Painel
+document.addEventListener("click", function(e){
+  if(e.target.closest("[data-goexec]")){ showTab("execucao"); window.scrollTo(0,0); }
+  else if(e.target.closest("[data-goevol]")){ showTab("evolucao"); window.scrollTo(0,0); }
+  else if(e.target.closest("[data-gotatico]")){ showTab("estrategia"); showPlanTab("tatico"); window.scrollTo(0,0); }
+});
+el("evoSeg").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-m]"); if(!b) return;
+  EVO_METRICA = b.getAttribute("data-m");
+  Array.prototype.forEach.call(document.querySelectorAll("#evoSeg button[data-m]"), function(x){
+    x.classList.toggle("on", x.getAttribute("data-m")===EVO_METRICA);
+  });
+  renderEvoBars();
+});
+el("stepper").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-etapa]"); if(!b) return;
+  var t = b.getAttribute("data-etapa");
+  if(t === "exec"){ showTab("execucao"); window.scrollTo(0,0); }
+  else showPlanTab(t);
+});
+
+// ===================== Execução e Controle =====================
+var RITUAIS = [];
+async function loadExecucao(){
+  refreshFca();
+  try{ var r = await jget("/rituais"); RITUAIS = r.rituais || []; }catch(_){ RITUAIS = []; }
+  renderRituais();
+  renderReflexao();
+}
+function renderRituais(){
+  var box = el("rituaisLista");
+  if(!RITUAIS.length){
+    box.innerHTML = '<div style="padding:14px 17px"><span class="hint">Nenhum ritual cadastrado.</span> '
+      + '<button class="linklike" id="ritualPadrao">criar os 4 rituais padrão →</button></div>';
+    return;
+  }
+  box.innerHTML = RITUAIS.map(function(rt, i){
+    return '<div class="grow" style="grid-template-columns:38px 1fr auto;gap:12px;align-items:center" data-ri="'+i+'">'
+      + '<div style="width:38px;height:38px;border-radius:10px;background:var(--accent-soft);color:var(--accent-strong);display:grid;place-items:center;font-weight:700;font-size:10px;text-align:center">'+rt.freq+'</div>'
+      + '<div style="min-width:0"><b style="display:block;font-size:13px">'+rt.nome+'</b>'
+      + '<span style="color:var(--muted);font-size:11.5px">'+[rt.quem, rt.objetivo].filter(Boolean).join(" · ")+'</span></div>'
+      + '<span style="color:var(--ink-2);font-weight:600;font-size:11.5px;white-space:nowrap">'+(rt.proxima||"")+'</span></div>';
+  }).join("");
+}
+function editorRitual(rt, anchor){
+  openEditor(anchor, [
+    {k:"freq", label:"Frequência", type:"select", value:rt?rt.freq:"SEM",
+      options:[["DIA","Diário"],["SEM","Semanal"],["MES","Mensal"],["TRI","Trimestral"]]},
+    {k:"nome", label:"Nome", cls:"w-lg", value:rt?rt.nome:"", ph:"ex.: Semanal de resultados · 1h"},
+    {k:"quem", label:"Participantes", cls:"w-lg", value:rt?(rt.quem||""):""},
+    {k:"objetivo", label:"Objetivo", cls:"w-lg", value:rt?(rt.objetivo||""):""},
+    {k:"proxima", label:"Próxima", cls:"w-sm", value:rt?(rt.proxima||""):"", ph:"ter 9h"}
+  ], async function(i){
+    if(!i.nome.value.trim()) throw new Error("Dê um nome ao ritual.");
+    var body = {freq:i.freq.value, nome:i.nome.value.trim(), quem:i.quem.value.trim()||null,
+      objetivo:i.objetivo.value.trim()||null, proxima:i.proxima.value.trim()||null};
+    if(rt) await jsend("PUT","/rituais/"+rt.id, body);
+    else await jsend("POST","/rituais", body);
+    loadExecucao();
+  }, rt?"Salvar":"Criar");
+}
+function renderReflexao(){
+  var c = last && last.cmp;
+  var itens = [];
+  if(c){
+    var melhor = c.ticket_atual && c.ticket_base && c.ticket_atual > c.ticket_base
+      ? "ticket médio ("+pct(c.ticket_atual/c.ticket_base-1)+")" : null;
+    if(c.var_ajustada >= 0) itens.push('<div style="display:flex;gap:9px"><span class="pg">▲</span><span><b>Acima do esperado:</b> venda comparável '+pct(c.var_ajustada)+' vs. ano anterior'+(melhor?" · "+melhor:"")+'.</span></div>');
+  }
+  var ruins = alertCache.filter(function(a){return a.sev==="r";});
+  if(ruins.length) itens.push('<div style="display:flex;gap:9px"><span class="pr">▼</span><span><b>Abaixo do esperado:</b> '+ruins.map(function(a){return a.titulo;}).slice(0,2).join(" · ")+' — '+fcaCache.filter(function(f){return f.status!=="resolvido"&&f.status!=="descartado";}).length+' FCA(s) em curso.</span></div>');
+  var fer = FERIADOS.filter(function(f){ return f.data > (EVO&&EVO.ancora||""); }).slice(0,1);
+  if(fer.length) itens.push('<div style="display:flex;gap:9px"><span class="pa">◆</span><span><b>Cenário à frente:</b> '+fer[0].nome+' em '+fmtDataBr(fer[0].data)+' — planejar estoque e escala.</span></div>');
+  el("reflexaoMes").innerHTML = itens.join("") || '<span class="hint">A reflexão aparece quando o painel tiver dados carregados.</span>';
+}
+
+// ===================== Sala do Conselho =====================
+var REUNIOES = [], MEMBROS = [];
+async function loadSala(){
+  try{ var r = await jget("/conselho/reunioes"); REUNIOES = r.reunioes || []; }catch(_){ REUNIOES = []; }
+  try{ var m = await jget("/governanca/membros"); MEMBROS = m.membros || []; }catch(_){ MEMBROS = []; }
+  try{ var d = await jget("/deliberacoes"); DELIBS = d.deliberacoes || []; }catch(_){}
+  renderSala();
+}
+function proximaReuniao(){
+  var ag = REUNIOES.filter(function(r){ return r.status === "agendada"; });
+  ag.sort(function(a,b){ return (a.data||"9999") < (b.data||"9999") ? -1 : 1; });
+  return ag[0] || null;
+}
+var DELIB_ST = {em_pauta:{txt:"EM PAUTA",cls:"pa"}, aprovada:{txt:"APROVADA",cls:"pg"}, concluida:{txt:"CONCLUÍDA",cls:"pg"}};
+function renderSala(){
+  var r = proximaReuniao();
+  if(r){
+    el("reuniaoTitulo").textContent = r.titulo;
+    el("reuniaoSub").textContent = (r.data ? fmtDataBr(r.data) : "data a definir")
+      + (r.hora ? " · "+r.hora : "") + (r.local ? " · "+r.local : "");
+    var dias = r.data ? Math.round((new Date(r.data) - new Date())/86400000) : null;
+    el("reuniaoChip").innerHTML = dias!=null
+      ? '<span class="'+(dias<=14?"pr":"pa")+'" style="font-weight:700;font-size:11px">● EM '+Math.max(0,dias)+' DIAS</span>' : "";
+    el("pautaLista").innerHTML = r.pauta.length
+      ? r.pauta.map(function(p){
+          return '<div class="grow" style="grid-template-columns:2fr .6fr 1fr;align-items:center;font-size:12.5px">'
+            + '<span style="font-weight:600">'+p.item+'</span>'
+            + '<span class="num" style="color:var(--muted)">'+(p.tempo||"—")+'</span>'
+            + '<span style="font-size:11.5px;color:var(--accent);font-weight:600">'+(p.material||"—")+'</span></div>';
+        }).join("")
+      : '<span class="hint" style="display:block;padding:14px 17px">Pauta vazia — clique em "Editar pauta".</span>';
+  } else {
+    el("reuniaoTitulo").textContent = "Reunião do conselho";
+    el("reuniaoSub").textContent = "nenhuma reunião agendada";
+    el("reuniaoChip").innerHTML = "";
+    el("pautaLista").innerHTML = '<span class="hint" style="display:block;padding:14px 17px">Agende a reunião trimestral em "Agendar / editar reunião".</span>';
+  }
+  el("delibLista").innerHTML = DELIBS.length
+    ? DELIBS.map(function(d, i){
+        var st = DELIB_ST[d.status] || {txt:d.status, cls:"pa"};
+        return '<div class="grow" data-di="'+i+'" style="grid-template-columns:2fr .9fr .9fr 1fr;align-items:center;font-size:12.5px;cursor:pointer" title="Clique para editar">'
+          + '<span style="font-weight:600">'+d.texto+'</span>'
+          + '<span class="num" style="color:var(--muted)">'+(d.data?fmtDataBr(d.data):"—")+'</span>'
+          + '<span class="'+st.cls+'" style="font-weight:700;font-size:11px">● '+st.txt+'</span>'
+          + '<span style="color:var(--muted);font-size:12px">'+(d.follow||"—")+'</span></div>';
+      }).join("")
+    : '<span class="hint" style="display:block;padding:14px 17px">Nenhuma deliberação registrada.</span>';
+  el("membrosLista").innerHTML = MEMBROS.length
+    ? MEMBROS.map(function(m, i){
+        var ini = (m.nome||"?").split(" ").map(function(w){return w[0];}).slice(0,2).join("").toUpperCase();
+        var conselho = m.tag === "conselho";
+        return '<div class="grow" data-mi="'+i+'" style="grid-template-columns:30px 1fr auto;gap:11px;align-items:center;font-size:12.5px;cursor:pointer" title="Clique para editar">'
+          + '<div class="avatar" style="width:30px;height:30px;font-size:11px">'+ini+'</div>'
+          + '<div style="min-width:0"><b style="display:block;font-size:13px">'+m.nome+'</b><span style="color:var(--muted);font-size:11.5px">'+(m.papel||"")+'</span></div>'
+          + '<span class="chip '+(conselho?"g":"n")+'" style="'+(conselho?"":"background:var(--accent-soft);color:var(--accent-strong)")+'">'+(conselho?"Conselho":"Diretoria")+'</span></div>';
+      }).join("")
+    : '<span class="hint" style="display:block;padding:14px 17px">Cadastre a diretoria e o conselho no ＋.</span>';
+  var atas = REUNIOES.filter(function(x){ return x.status === "realizada"; });
+  el("atasLista").innerHTML = atas.length
+    ? atas.map(function(a){
+        return '<span>'+a.titulo+' — '+(a.data?fmtDataBr(a.data):"")+(a.assinada?' · <b class="pg">assinada</b>':'')+'</span>';
+      }).join("")
+    : '<span class="hint">Reuniões realizadas aparecem aqui.</span>';
+}
+function editorDeliberacao(d, anchor){
+  openEditor(anchor, [
+    {k:"texto", label:"Deliberação", cls:"w-lg", value:d?d.texto:"", ph:"ex.: Aprovar CAPEX da Loja 5"},
+    {k:"data", label:"Data", type:"date", value:d?(d.data||""):""},
+    {k:"status", label:"Status", type:"select", value:d?d.status:"em_pauta",
+      options:[["em_pauta","Em pauta"],["aprovada","Aprovada"],["concluida","Concluída"]]},
+    {k:"follow", label:"Follow-up", cls:"w-lg", value:d?(d.follow||""):"", ph:"quem · até quando"}
+  ], async function(i){
+    if(!i.texto.value.trim()) throw new Error("Descreva a deliberação.");
+    var body = {texto:i.texto.value.trim(), data:i.data.value||null, status:i.status.value,
+      follow:i.follow.value.trim()||null};
+    if(d) await jsend("PUT","/deliberacoes/"+d.id, body);
+    else await jsend("POST","/deliberacoes", body);
+    loadSala();
+  }, d?"Salvar":"Registrar");
+}
+function editorMembro(m, anchor){
+  openEditor(anchor, [
+    {k:"nome", label:"Nome", cls:"w-lg", value:m?m.nome:""},
+    {k:"papel", label:"Papel", cls:"w-lg", value:m?(m.papel||""):"", ph:"ex.: Diretora Comercial"},
+    {k:"tag", label:"Grupo", type:"select", value:m?m.tag:"diretoria",
+      options:[["diretoria","Diretoria"],["conselho","Conselho"]]}
+  ], async function(i){
+    if(!i.nome.value.trim()) throw new Error("Informe o nome.");
+    var body = {nome:i.nome.value.trim(), papel:i.papel.value.trim()||null, tag:i.tag.value};
+    if(m) await jsend("PUT","/governanca/membros/"+m.id, body);
+    else await jsend("POST","/governanca/membros", body);
+    loadSala();
+  }, m?"Salvar":"Adicionar");
+}
+function editorReuniao(r, anchor){
+  openEditor(anchor, [
+    {k:"titulo", label:"Título", cls:"w-lg", value:r?r.titulo:"Reunião trimestral do conselho"},
+    {k:"data", label:"Data", type:"date", value:r?(r.data||""):""},
+    {k:"hora", label:"Horário", cls:"w-sm", value:r?(r.hora||""):"", ph:"14h–17h"},
+    {k:"local", label:"Local", cls:"w-lg", value:r?(r.local||""):"", ph:"sala Matriz + vídeo"},
+    {k:"status", label:"Status", type:"select", value:r?r.status:"agendada",
+      options:[["agendada","Agendada"],["realizada","Realizada (vira ata)"]]},
+    {k:"assinada", label:"Ata assinada", type:"select", value:r&&r.assinada?"1":"",
+      options:[["","Não"],["1","Sim"]]}
+  ], async function(i){
+    var body = {titulo:i.titulo.value.trim()||"Reunião do conselho", data:i.data.value||null,
+      hora:i.hora.value.trim()||null, local:i.local.value.trim()||null,
+      status:i.status.value, assinada:!!i.assinada.value};
+    if(r) await jsend("PUT","/conselho/reunioes/"+r.id, body);
+    else await jsend("POST","/conselho/reunioes", body);
+    loadSala();
+  }, r?"Salvar":"Agendar");
+}
+el("btnReuniao").addEventListener("click", function(){ editorReuniao(proximaReuniao(), el("btnReuniao").parentNode); });
+el("btnPauta").addEventListener("click", function(){
+  var r = proximaReuniao();
+  if(!r){ window.alert("Agende a reunião primeiro."); return; }
+  var atual = r.pauta.map(function(p){ return [p.item, p.tempo||"", p.material||""].join(" ; "); }).join("\n");
+  var txt = window.prompt("Pauta — uma linha por item, no formato:\nitem ; tempo ; material", atual);
+  if(txt == null) return;
+  var pauta = txt.split("\n").map(function(l){ return l.trim(); }).filter(Boolean).map(function(l){
+    var p = l.split(";").map(function(s){ return s.trim(); });
+    return {item:p[0]||"", tempo:p[1]||null, material:p[2]||null};
+  });
+  jsend("PUT","/conselho/reunioes/"+r.id, {titulo:r.titulo, data:r.data, hora:r.hora, local:r.local,
+    status:r.status, assinada:r.assinada, pauta:pauta}).then(loadSala)
+    .catch(function(e){ window.alert(e.message); });
+});
+el("btnCaderno").addEventListener("click", async function(){
+  var r = proximaReuniao();
+  if(!r){ window.alert("Agende a reunião primeiro."); return; }
+  el("cadernoBox").classList.remove("hide");
+  el("cadernoTxt").textContent = "Gerando o caderno…";
+  try{
+    var res = await jsend("POST","/conselho/reunioes/"+r.id+"/caderno");
+    el("cadernoTxt").textContent = res.caderno;
+  }catch(e){ el("cadernoTxt").textContent = "Erro: "+e.message; }
+});
+el("delibAdd").addEventListener("click", function(){ editorDeliberacao(null, el("delibAdd").parentNode); });
+el("delibLista").addEventListener("click", function(e){
+  var row = e.target.closest("[data-di]"); if(!row) return;
+  editorDeliberacao(DELIBS[+row.getAttribute("data-di")], row);
+});
+el("membroAdd").addEventListener("click", function(){ editorMembro(null, el("membroAdd").parentNode); });
+el("membrosLista").addEventListener("click", function(e){
+  var row = e.target.closest("[data-mi]"); if(!row) return;
+  editorMembro(MEMBROS[+row.getAttribute("data-mi")], row);
+});
+el("ritualAdd").addEventListener("click", function(){ editorRitual(null, el("ritualAdd").parentNode); });
+el("rituaisLista").addEventListener("click", function(e){
+  if(e.target.closest("#ritualPadrao")){
+    jsend("POST","/rituais/padrao").then(loadExecucao).catch(function(err){ window.alert(err.message); });
+    return;
+  }
+  var row = e.target.closest("[data-ri]"); if(!row) return;
+  editorRitual(RITUAIS[+row.getAttribute("data-ri")], row);
+});
+
+// ===================== Plano: ciclo anual + tático =====================
+function renderCiclo(){
+  var ano = el("ano").value;
+  el("cicloSeg").innerHTML = '<button data-ciclo="corrente" class="on">'+ano+' · ativo</button>'
+    + '<button data-ciclo="comparar">⇄ Anos</button>';
+  el("btnProxCiclo").textContent = "+ Planejar "+(+ano+1)+" · abre em nov";
+  var mes = +el("mes").value;
+  var tri = Math.ceil(mes/3);
+  el("forecastTri").innerHTML = "Forecast trimestral: " + [1,2,3,4].map(function(t){
+    if(t < tri) return '<b class="pg">T'+t+' ✓</b>';
+    if(t === tri) return '<b class="pa">T'+t+' em curso</b>';
+    return 'T'+t;
+  }).join(" · ");
+}
+function renderCicloComparar(){
+  var ms = (EVO && EVO.meses) || [];
+  var ano = +el("ano").value;
+  var doAno = ms.filter(function(m){ return m.mes.slice(0,4) == ano; });
+  var metaSoma = 0, realSoma = 0, temMeta = false;
+  doAno.forEach(function(m){
+    if(m.meta!=null){ metaSoma += m.meta; temMeta = true; }
+    realSoma += m.tipo==="previsto" ? (m.previsto||0) : (m.tipo==="corrente" ? (m.projetado||m.realizado||0) : (m.realizado||0));
+  });
+  var okrsBat = okrCache.filter(function(o){ return objStatus(o).txt==="NO RITMO"; }).length;
+  el("cicloRows").innerHTML = '<div class="grow" style="grid-template-columns:.7fr 1.4fr 1fr 1fr .9fr;align-items:center;font-size:12.5px">'
+    + '<span><b style="font-size:13px">'+ano+'</b><span style="display:block;color:var(--faint);font-size:10.5px">em curso</span></span>'
+    + '<span class="num">'+(temMeta?brl(metaSoma):"sem meta")+' → <b class="pa">proj. '+brl(realSoma)+'</b></span>'
+    + '<span class="num" style="color:var(--muted)">—</span>'
+    + '<span class="num" style="color:var(--muted)">—</span>'
+    + '<span class="tr"><span class="chip '+(okrsBat===okrCache.length&&okrCache.length?"g":"n")+'">'+okrsBat+"/"+okrCache.length+' · em curso</span></span></div>'
+    + '<div style="padding:12px 17px" class="hint">Os ciclos anteriores aparecem aqui a cada fechamento de ano — este é o primeiro ciclo do BoardOS nesta rede.</div>';
+}
+el("cicloSeg").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-ciclo]"); if(!b) return;
+  var modo = b.getAttribute("data-ciclo");
+  Array.prototype.forEach.call(document.querySelectorAll("#cicloSeg button"), function(x){
+    x.classList.toggle("on", x===b);
+  });
+  el("cicloComparar").classList.toggle("hide", modo!=="comparar");
+  el("cicloCorrente").classList.toggle("hide", modo==="comparar");
+  if(modo==="comparar"){
+    if(!EVO) jget("/kpi/mensal?fut=6").then(function(k){ EVO=k; renderCicloComparar(); }).catch(function(){ renderCicloComparar(); });
+    else renderCicloComparar();
+  }
+});
+el("btnProxCiclo").addEventListener("click", function(){
+  window.alert("O planejamento do próximo ciclo abre em novembro: as metas partem do realizado deste ano.");
+});
+function renderTatico(){
+  el("iniSub").textContent = INIS.length ? INIS.length+" iniciativa(s)" : "";
+  var box = el("iniLista");
+  if(!INIS.length){
+    box.innerHTML = '<span class="hint">Sem iniciativas ainda — crie a primeira e ligue as ações 5W2H a ela.</span>'; return;
+  }
+  var AC_ST = {planejada:{txt:"A INICIAR",cls:"hint"}, em_andamento:{txt:"EM CURSO",cls:"pa"},
+    concluida:{txt:"CONCLUÍDA",cls:"pg"}, cancelada:{txt:"CANCELADA",cls:"hint"}};
+  box.innerHTML = INIS.map(function(ini, i){
+    var acoes = ini.acoes.map(function(a){
+      var st = AC_ST[a.status] || {txt:a.status, cls:"pa"};
+      return '<div class="grow" style="grid-template-columns:2fr 1fr .9fr .8fr .9fr;align-items:center;font-size:12.5px">'
+        + '<span><b>'+a.oque+'</b>'+(a.como?'<span style="color:var(--muted);display:block;font-size:11.5px">'+a.como+'</span>':"")+'</span>'
+        + '<span style="color:var(--ink-2)">'+(a.quem||"—")+'</span>'
+        + '<span class="num" style="color:var(--ink-2)">'+(a.quando?fmtDataBr(a.quando):"—")+'</span>'
+        + '<span class="tr num" style="color:var(--ink-2)">'+(a.quanto!=null?"R$ "+(+a.quanto).toLocaleString("pt-BR"):"—")+'</span>'
+        + '<span class="tr '+st.cls+'" style="font-weight:700;font-size:11px">● '+st.txt+'</span></div>';
+    }).join("");
+    return '<div class="gtable"><div style="display:flex;align-items:center;gap:12px;padding:15px 17px;border-bottom:1px solid var(--border);flex-wrap:wrap">'
+      + '<span class="badge-soft" style="font-weight:700;font-size:11px">INICIATIVA</span>'
+      + '<b style="font-size:14.5px;letter-spacing:-.2px">'+ini.nome+'</b>'
+      + (ini.objetivo?'<span style="font-size:11px;color:var(--faint);font-weight:600;background:var(--surface-2);border:1px solid var(--border);padding:2px 8px;border-radius:999px">liga: '+ini.objetivo+'</span>':"")
+      + '<span class="obj-actions"><button class="ib" data-iact="e" data-ii="'+i+'" title="Editar">✎</button>'
+      + '<button class="ib danger" data-iact="x" data-ii="'+i+'" title="Excluir">×</button></span>'
+      + '<span style="margin-left:auto;color:var(--muted);font-size:12px">dono: '+(ini.dono||"a definir")
+      + (ini.orcamento!=null?' · orçamento R$ '+(+ini.orcamento).toLocaleString("pt-BR"):"")+'</span></div>'
+      + '<div class="gcols" style="grid-template-columns:2fr 1fr .9fr .8fr .9fr"><span>Ação (o quê · como)</span><span>Quem</span><span>Quando</span><span class="tr">Quanto</span><span class="tr">Status</span></div>'
+      + (acoes || '<span class="hint" style="display:block;padding:12px 17px">Sem ações — crie em "＋ Ação" e ligue a esta iniciativa.</span>')
+      + '</div>';
+  }).join("");
+}
+function editorIniciativa(ini, anchor){
+  var opts = [["",""]].concat(okrCache.map(function(o){ return [o.id, o.titulo]; }));
+  openEditor(anchor, [
+    {k:"nome", label:"Nome", cls:"w-lg", value:ini?ini.nome:"", ph:"ex.: Zerar ruptura de FDS na Centro"},
+    {k:"objetivo_id", label:"Liga ao objetivo", type:"select", value:ini?(ini.objetivo_id||""):"", options:opts},
+    {k:"dono", label:"Dono", cls:"w-sm", value:ini?(ini.dono||""):""},
+    {k:"orcamento", label:"Orçamento (R$)", cls:"w-sm", type:"number", value:ini&&ini.orcamento!=null?ini.orcamento:""}
+  ], async function(i){
+    if(!i.nome.value.trim()) throw new Error("Dê um nome à iniciativa.");
+    var body = {nome:i.nome.value.trim(), objetivo_id:i.objetivo_id.value||null,
+      dono:i.dono.value.trim()||null, orcamento:i.orcamento.value!==""?+i.orcamento.value:null};
+    if(ini) await jsend("PUT","/iniciativas/"+ini.id, body);
+    else await jsend("POST","/iniciativas", body);
+    var r = await jget("/iniciativas"); INIS = r.iniciativas || [];
+    renderTatico(); renderIniHome(); updateCicloCard();
+  }, ini?"Salvar":"Criar");
+}
+el("iniAdd").addEventListener("click", function(){ editorIniciativa(null, el("iniAdd").parentNode); });
+el("iniLista").addEventListener("click", function(e){
+  var b = e.target.closest("button.ib"); if(!b) return;
+  var ini = INIS[+b.getAttribute("data-ii")]; if(!ini) return;
+  if(b.getAttribute("data-iact")==="e") editorIniciativa(ini, b.closest(".gtable"));
+  else if(window.confirm("Excluir a iniciativa "+ini.nome+"? (as ações ligadas ficam avulsas)")){
+    jsend("DELETE","/iniciativas/"+ini.id).then(async function(){
+      var r = await jget("/iniciativas"); INIS = r.iniciativas || [];
+      renderTatico(); renderIniHome();
+    }).catch(function(err){ window.alert(err.message); });
+  }
+});
+
+// ===================== Advisor: jornadas guiadas =====================
+var JORNADAS = [], JOR = null, JOR_IDX = 0;
+async function refreshJornadas(){
+  try{ var r = await jget("/jornadas"); JORNADAS = r.jornadas || []; JORNADAS_DESC = r.descoberta_respondidas || 0; }
+  catch(_){ JORNADAS = []; }
+  renderJornadas();
+}
+var JORNADAS_DESC = 0;
+function renderJornadas(){
+  var cards = [{nome:"Direção Estratégica", desc:"Entrevista guiada: propósito, essência, visão e sonho grande.",
+    status: JORNADAS_DESC>=17 ? {txt:"CONCLUÍDA",cls:"pg"} : JORNADAS_DESC>0 ? {txt:Math.round(JORNADAS_DESC/17*100)+"%",cls:"pa"} : {txt:"NÃO INICIADA",cls:"hint"},
+    cta: JORNADAS_DESC>0 ? "Revisar respostas" : "Começar", go:"descoberta"}];
+  JORNADAS.forEach(function(j){
+    cards.push({nome:j.nome, desc:j.desc,
+      status: j.respondidas>=j.total ? {txt:"CONCLUÍDA",cls:"pg"} : j.respondidas>0 ? {txt:Math.round(j.respondidas/j.total*100)+"%",cls:"pa"} : {txt:"NÃO INICIADA",cls:"hint"},
+      cta: j.respondidas>0 ? "Continuar entrevista" : "Começar", go:j.jornada});
+  });
+  el("jornadasRow").innerHTML = cards.map(function(c){
+    return '<section class="card" style="padding:16px;display:flex;flex-direction:column;gap:8px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="font-size:13.5px">'+c.nome+'</b>'
+      + '<span class="'+c.status.cls+'" style="font-size:11px;font-weight:700;white-space:nowrap;flex-shrink:0">'+c.status.txt+'</span></div>'
+      + '<p style="margin:0;font-size:12px;color:var(--muted)">'+c.desc+'</p>'
+      + '<button class="linklike" data-jor="'+c.go+'" style="text-align:left">'+c.cta+' →</button></section>';
+  }).join("");
+}
+function abrirJornada(key){
+  if(key === "descoberta"){ showTab("estrategia"); showPlanTab("direcao"); window.scrollTo(0,0); return; }
+  JOR = JORNADAS.filter(function(j){ return j.jornada === key; })[0];
+  if(!JOR) return;
+  JOR_IDX = 0;
+  for(var i=0;i<JOR.perguntas.length;i++){
+    if(!(JOR.respostas[JOR.perguntas[i].k]||"").trim()){ JOR_IDX = i; break; }
+  }
+  el("jornadaCard").classList.remove("hide");
+  el("jorTitulo").textContent = JOR.nome;
+  if(JOR.resumo){ el("jorResumo").textContent = JOR.resumo; el("jorResumo").classList.remove("hide"); }
+  else el("jorResumo").classList.add("hide");
+  renderJorPergunta();
+  el("jornadaCard").scrollIntoView({behavior:"smooth", block:"start"});
+}
+function renderJorPergunta(){
+  if(!JOR) return;
+  if(JOR_IDX < 0) JOR_IDX = 0;
+  if(JOR_IDX >= JOR.perguntas.length) JOR_IDX = JOR.perguntas.length - 1;
+  var p = JOR.perguntas[JOR_IDX];
+  var n = JOR.perguntas.filter(function(q){ return (JOR.respostas[q.k]||"").trim(); }).length;
+  el("jorProg").textContent = n + " de " + JOR.perguntas.length + " respondidas";
+  el("jorPergunta").textContent = (JOR_IDX+1) + ". " + p.q;
+  el("jorInput").value = JOR.respostas[p.k] || "";
+  el("jorHint").textContent = "";
+}
+el("jornadasRow").addEventListener("click", function(e){
+  var b = e.target.closest("[data-jor]"); if(!b) return;
+  abrirJornada(b.getAttribute("data-jor"));
+});
+el("jorFechar").addEventListener("click", function(){ el("jornadaCard").classList.add("hide"); });
+el("jorAnt").addEventListener("click", function(){ JOR_IDX--; renderJorPergunta(); });
+el("jorProx").addEventListener("click", function(){ JOR_IDX++; renderJorPergunta(); });
+el("jorSalvar").addEventListener("click", async function(){
+  if(!JOR) return;
+  var p = JOR.perguntas[JOR_IDX];
+  JOR.respostas[p.k] = el("jorInput").value.trim();
+  try{
+    await jsend("PUT","/jornadas/"+JOR.jornada, {respostas: JOR.respostas});
+    el("jorHint").textContent = "Resposta salva.";
+    if(JOR_IDX < JOR.perguntas.length-1){ JOR_IDX++; }
+    renderJorPergunta(); renderJornadas();
+  }catch(e){ el("jorHint").textContent = "Erro ao salvar: "+e.message; }
+});
+el("jorGerar").addEventListener("click", async function(){
+  if(!JOR) return;
+  el("jorHint").textContent = "Gerando o material…";
+  try{
+    var r = await jsend("POST","/jornadas/"+JOR.jornada+"/resumo");
+    JOR.resumo = r.resumo;
+    el("jorResumo").textContent = r.resumo;
+    el("jorResumo").classList.remove("hide");
+    el("jorHint").textContent = r.fonte==="ia" ? "Material gerado por IA." : "Material organizado (a IA refina quando estiver ativa).";
+  }catch(e){ el("jorHint").textContent = e.message; }
+});
+
+// ===================== Minha Rede: mapa + demografia =====================
+var REDE_SEL = null, MAPA_PRONTO = false;
+function lojasParaMapa(){
+  return lojasCache.map(function(l){
+    return {id:l.id, nome:l.nome, ini:(l.nome||"?").replace(/^Loja\s+/i,"").slice(0,1).toUpperCase(),
+      lat:l.lat, lng:l.lng};
+  });
+}
+function mandarLojasAoMapa(){
+  var f = el("mapaLojas");
+  if(f && f.contentWindow) f.contentWindow.postMessage({boardosLojas: lojasParaMapa()}, "*");
+}
+function renderRede(){
+  if(!lojasCache.length){
+    jget("/lojas").then(function(r){ lojasCache = r.lojas || []; renderRede(); }).catch(function(){});
+  }
+  el("redeLojasLista").innerHTML = lojasCache.length
+    ? lojasCache.map(function(l, i){
+        var sel = REDE_SEL === l.id;
+        return '<div class="grow" data-rl="'+i+'" style="grid-template-columns:30px 1fr auto;gap:11px;align-items:center;cursor:pointer;'
+          + (sel?"background:var(--accent-soft)":"")+'" >'
+          + '<div class="avatar" style="width:30px;height:30px;font-size:11px;'+(sel?"background:var(--accent-strong);color:#fff":"")+'">'
+          + (l.nome||"?").replace(/^Loja\s+/i,"").slice(0,1).toUpperCase()+'</div>'
+          + '<div style="min-width:0"><b style="display:block;font-size:13px">'+l.nome+'</b>'
+          + '<span style="color:var(--muted);font-size:11.5px">'+(l.endereco||l.municipio||"sem endereço")
+          + (l.lat==null?' · <span class="pa">sem coordenadas</span>':"")+'</span></div>'
+          + '<span style="font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap">'
+          + (l.area_vendas_m2?(+l.area_vendas_m2).toLocaleString("pt-BR")+" m²":(l.formato||""))+'</span></div>';
+      }).join("")
+    : '<span class="hint" style="display:block;padding:14px 17px">Nenhuma loja cadastrada.</span>';
+  mandarLojasAoMapa();
+  renderDemografia();
+}
+function renderDemografia(){
+  var l = lojasCache.filter(function(x){ return x.id === REDE_SEL; })[0] || lojasCache[0];
+  if(!l){ el("demoBox").innerHTML = '<span class="hint">Selecione uma loja.</span>'; return; }
+  el("demoTitulo").textContent = "Demografia — " + l.nome;
+  var pop = l.populacao ? (+l.populacao).toLocaleString("pt-BR") : null;
+  var pib = l.pib_per_capita ? "R$ "+(+l.pib_per_capita).toLocaleString("pt-BR",{maximumFractionDigits:0}) : null;
+  var linhas = [];
+  if(pop || pib){
+    linhas.push('<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Município ('+(l.municipio||"—")+(l.uf?"/"+l.uf:"")+')</span><span></span></div>');
+    if(pop) linhas.push('<div style="display:flex;justify-content:space-between"><span>População'+(l.populacao_ano?' <span class="hint">(IBGE '+l.populacao_ano+')</span>':'')+'</span><b class="num">'+pop+'</b></div>');
+    if(pib) linhas.push('<div style="display:flex;justify-content:space-between"><span>PIB por habitante'+(l.pib_ano?' <span class="hint">(IBGE '+l.pib_ano+')</span>':'')+'</span><b class="num">'+pib+'</b></div>');
+  } else {
+    linhas.push('<span class="hint">Cadastre município/UF na loja para puxar o contexto do IBGE.</span>');
+  }
+  linhas.push('<div style="margin-top:6px;padding:10px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);font-size:11.5px;color:var(--faint)">'
+    + 'Áreas primária/secundária/terciária com população, domicílios, renda e potencial de consumo por setor censitário (Censo 2022 + POF/IBGE): <b>em breve</b> — requer a malha censitária por raio.</div>');
+  el("demoBox").innerHTML = linhas.join("");
+}
+el("redeLojasLista").addEventListener("click", function(e){
+  var row = e.target.closest("[data-rl]"); if(!row) return;
+  var l = lojasCache[+row.getAttribute("data-rl")]; if(!l) return;
+  REDE_SEL = l.id;
+  var f = el("mapaLojas");
+  if(f && f.contentWindow) f.contentWindow.postMessage({boardosLoja: l.id}, "*");
+  renderRede();
+});
+el("redeLojaAdd").addEventListener("click", function(){ editorLoja(null, el("redeLojaAdd").parentNode); });
+window.addEventListener("message", function(e){
+  if(e.data && e.data.boardosMapaPronto){ MAPA_PRONTO = true; mandarLojasAoMapa(); }
+  if(e.data && e.data.boardosLoja){ REDE_SEL = e.data.boardosLoja; renderRede(); }
 });
 
 boot();

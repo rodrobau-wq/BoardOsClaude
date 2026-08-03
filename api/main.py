@@ -558,6 +558,7 @@ class DirecaoIn(BaseModel):
     visao: Optional[str] = None
     valores: Optional[str] = None
     objetivo_lp: Optional[str] = None
+    competencia: Optional[str] = None
 
 
 class SwotIn(BaseModel):
@@ -579,6 +580,7 @@ class AcaoIn(BaseModel):
     quanto: Optional[float] = None
     status: str = "planejada"
     objetivo_id: Optional[str] = None
+    iniciativa_id: Optional[str] = None
 
 
 RADAR_AREAS = ["Comercial/Vendas", "Marketing/Fidelização", "Operação/Pessoas",
@@ -633,10 +635,10 @@ def descoberta_resumo(user: dict = Depends(current), tid: str = Depends(tenant_o
 @app.get("/direcao")
 def direcao_get(tid: str = Depends(tenant_of)):
     with tenant_session(tid) as cur:
-        cur.execute("SELECT proposito, visao, valores, objetivo_lp "
+        cur.execute("SELECT proposito, visao, valores, objetivo_lp, competencia "
                     "FROM direcao_estrategica WHERE tenant_id=%s", (tid,))
         row = cur.fetchone()
-    campos = ["proposito", "visao", "valores", "objetivo_lp"]
+    campos = ["proposito", "visao", "valores", "objetivo_lp", "competencia"]
     return dict(zip(campos, row)) if row else {c: None for c in campos}
 
 
@@ -645,11 +647,11 @@ def direcao_put(body: DirecaoIn, user: dict = Depends(current), tid: str = Depen
     _can_edit(user)
     with tenant_session(tid) as cur:
         cur.execute(
-            "INSERT INTO direcao_estrategica (tenant_id, proposito, visao, valores, objetivo_lp, atualizado_em) "
-            "VALUES (%s,%s,%s,%s,%s,now()) ON CONFLICT (tenant_id) DO UPDATE SET "
+            "INSERT INTO direcao_estrategica (tenant_id, proposito, visao, valores, objetivo_lp, competencia, atualizado_em) "
+            "VALUES (%s,%s,%s,%s,%s,%s,now()) ON CONFLICT (tenant_id) DO UPDATE SET "
             "proposito=EXCLUDED.proposito, visao=EXCLUDED.visao, valores=EXCLUDED.valores, "
-            "objetivo_lp=EXCLUDED.objetivo_lp, atualizado_em=now()",
-            (tid, body.proposito, body.visao, body.valores, body.objetivo_lp))
+            "objetivo_lp=EXCLUDED.objetivo_lp, competencia=EXCLUDED.competencia, atualizado_em=now()",
+            (tid, body.proposito, body.visao, body.valores, body.objetivo_lp, body.competencia))
     return {"ok": True}
 
 
@@ -715,11 +717,11 @@ def acoes_get(tid: str = Depends(tenant_of)):
     with tenant_session(tid) as cur:
         cur.execute(
             "SELECT a.id, a.oque, a.porque, a.onde, a.quando, a.quem, a.como, a.quanto, "
-            "a.status, a.objetivo_id, o.titulo "
+            "a.status, a.objetivo_id, o.titulo, a.iniciativa_id "
             "FROM acao_5w2h a LEFT JOIN okr_objetivo o ON o.id=a.objetivo_id "
             "ORDER BY (a.status IN ('concluida','cancelada')), a.quando NULLS LAST, a.criado_em")
         cols = ["id", "oque", "porque", "onde", "quando", "quem", "como", "quanto",
-                "status", "objetivo_id", "objetivo"]
+                "status", "objetivo_id", "objetivo", "iniciativa_id"]
         rows = []
         for r in cur.fetchall():
             d = dict(zip(cols, r))
@@ -727,6 +729,7 @@ def acoes_get(tid: str = Depends(tenant_of)):
             d["quando"] = str(d["quando"]) if d["quando"] else None
             d["quanto"] = float(d["quanto"]) if d["quanto"] is not None else None
             d["objetivo_id"] = str(d["objetivo_id"]) if d["objetivo_id"] else None
+            d["iniciativa_id"] = str(d["iniciativa_id"]) if d["iniciativa_id"] else None
             rows.append(d)
     return {"acoes": rows}
 
@@ -738,10 +741,11 @@ def acoes_post(body: AcaoIn, user: dict = Depends(current), tid: str = Depends(t
         raise HTTPException(400, "Descreva a ação (O quê).")
     with tenant_session(tid) as cur:
         cur.execute(
-            "INSERT INTO acao_5w2h (tenant_id, objetivo_id, oque, porque, onde, quando, quem, como, quanto, status) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "INSERT INTO acao_5w2h (tenant_id, objetivo_id, oque, porque, onde, quando, quem, como, quanto, status, iniciativa_id) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (tid, body.objetivo_id, body.oque.strip(), body.porque, body.onde,
-             body.quando or None, body.quem, body.como, body.quanto, body.status))
+             body.quando or None, body.quem, body.como, body.quanto, body.status,
+             body.iniciativa_id))
         aid = cur.fetchone()[0]
     return {"id": str(aid)}
 
@@ -752,9 +756,10 @@ def acoes_put(aid: str, body: AcaoIn, user: dict = Depends(current), tid: str = 
     with tenant_session(tid) as cur:
         cur.execute(
             "UPDATE acao_5w2h SET oque=%s, porque=%s, onde=%s, quando=%s, quem=%s, "
-            "como=%s, quanto=%s, status=%s, objetivo_id=%s WHERE id=%s",
+            "como=%s, quanto=%s, status=%s, objetivo_id=%s, iniciativa_id=%s WHERE id=%s",
             (body.oque.strip(), body.porque, body.onde, body.quando or None,
-             body.quem, body.como, body.quanto, body.status, body.objetivo_id, aid))
+             body.quem, body.como, body.quanto, body.status, body.objetivo_id,
+             body.iniciativa_id, aid))
         if cur.rowcount == 0:
             raise HTTPException(404, "Ação não encontrada.")
     return {"ok": True}
@@ -779,10 +784,12 @@ class LojaIn(BaseModel):
     municipio: Optional[str] = None
     uf: Optional[str] = None
     area_vendas_m2: Optional[float] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
 
 
 LOJA_COLS = ("id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2, "
-             "ibge_id, populacao, populacao_ano, pib_per_capita, pib_ano")
+             "ibge_id, populacao, populacao_ano, pib_per_capita, pib_ano, lat, lng")
 
 
 def _loja_row(r):
@@ -791,7 +798,9 @@ def _loja_row(r):
             "area_vendas_m2": float(r[7]) if r[7] is not None else None,
             "ibge_id": r[8], "populacao": r[9], "populacao_ano": r[10],
             "pib_per_capita": float(r[11]) if r[11] is not None else None,
-            "pib_ano": r[12]}
+            "pib_ano": r[12],
+            "lat": float(r[13]) if r[13] is not None else None,
+            "lng": float(r[14]) if r[14] is not None else None}
 
 
 def _ibge_atualiza(cur, loja_id: str, municipio: str, uf: str) -> None:
@@ -827,11 +836,11 @@ def lojas_post(body: LojaIn, user: dict = Depends(current), tid: str = Depends(t
         if cur.fetchone():
             raise HTTPException(409, "Já existe uma loja com esse código.")
         cur.execute(
-            "INSERT INTO loja (tenant_id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "INSERT INTO loja (tenant_id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2, lat, lng) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (tid, body.codigo.strip(), body.nome.strip(), body.formato,
              body.endereco, body.municipio, (body.uf or "").upper()[:2] or None,
-             body.area_vendas_m2))
+             body.area_vendas_m2, body.lat, body.lng))
         lid = str(cur.fetchone()[0])
         if body.municipio and body.uf:
             _ibge_atualiza(cur, lid, body.municipio, body.uf)
@@ -846,10 +855,10 @@ def lojas_put(lid: str, body: LojaIn, user: dict = Depends(current), tid: str = 
     with tenant_session(tid) as cur:
         cur.execute(
             "UPDATE loja SET codigo=%s, nome=%s, formato=%s, endereco=%s, "
-            "municipio=%s, uf=%s, area_vendas_m2=%s WHERE id=%s",
+            "municipio=%s, uf=%s, area_vendas_m2=%s, lat=%s, lng=%s WHERE id=%s",
             (body.codigo.strip(), body.nome.strip(), body.formato, body.endereco,
              body.municipio, (body.uf or "").upper()[:2] or None,
-             body.area_vendas_m2, lid))
+             body.area_vendas_m2, body.lat, body.lng, lid))
         if cur.rowcount == 0:
             raise HTTPException(404, "Loja não encontrada.")
         if body.municipio and body.uf:
@@ -1391,15 +1400,18 @@ def _add_meses(ano: int, mes: int, delta: int):
 
 
 @app.get("/kpi/mensal")
-def kpi_mensal(tid: str = Depends(tenant_of)):
-    """Visão de 13 meses + tendência: 12 meses fechados, o mês corrente
+def kpi_mensal(fut: int = 3, tid: str = Depends(tenant_of)):
+    """Visão mensal + tendência: 12 meses fechados, o mês corrente
     (realizado + projeção do restante, recalculada a cada dia) e os próximos
-    3 meses projetados. "Programado" = faturamento do mesmo mês do ano
-    anterior × meta anual do KR de faturamento (quando existirem).
+    `fut` meses projetados (3 a 6). "Programado" = faturamento do mesmo mês do
+    ano anterior × meta anual do KR de faturamento (quando existirem).
+    Cada mês realizado carrega também itens/cupons/margem para as séries de
+    Volume, Ticket, Margem e Preço×Custo da tela Evolução.
     """
     import calendar as _cal2
     from datetime import date as _date, timedelta as _td
 
+    fut = max(1, min(6, fut))
     with tenant_session(tid) as cur:
         cur.execute("SELECT max(data) FROM gold_venda_diaria")
         row = cur.fetchone()
@@ -1408,46 +1420,65 @@ def kpi_mensal(tid: str = Depends(tenant_of)):
             return {"meses": [], "ancora": None}
         ancora = min(_date.today(), ult)
         a0, m0 = ancora.year, ancora.month
-        # histórico diário: 25 meses p/ trás (cobre ano-anterior dos 13+3 meses)
+        # histórico diário: 25 meses p/ trás (cobre ano-anterior dos 13+fut meses)
         ia, im = _add_meses(a0, m0, -25)
         cur.execute(
-            "SELECT data, sum(faturamento_liq) FROM gold_venda_diaria "
+            "SELECT data, sum(faturamento_liq), sum(itens), sum(cupons), sum(margem) "
+            "FROM gold_venda_diaria "
             "WHERE categoria_id IS NULL AND data BETWEEN %s AND %s "
             "GROUP BY data ORDER BY data",
             (_date(ia, im, 1), ancora))
-        hist = [{"data": r[0], "faturamento_liq": float(r[1])} for r in cur.fetchall()]
+        rows = cur.fetchall()
+        hist = [{"data": r[0], "faturamento_liq": float(r[1])} for r in rows]
         cur.execute("SELECT meta FROM okr_kr WHERE fonte='fat_yoy_pct' LIMIT 1")
         r = cur.fetchone()
         meta_pct = float(r[0]) if r else None
 
     por_mes: dict = {}
-    for h in hist:
-        k = (h["data"].year, h["data"].month)
-        por_mes[k] = por_mes.get(k, 0.0) + h["faturamento_liq"]
+    for d0, fat, itn, cup, mrg in rows:
+        k = (d0.year, d0.month)
+        acc = por_mes.setdefault(k, {"fat": 0.0, "itens": 0, "cupons": 0, "margem": 0.0})
+        acc["fat"] += float(fat)
+        acc["itens"] += int(itn or 0)
+        acc["cupons"] += int(cup or 0)
+        acc["margem"] += float(mrg or 0)
+
+    def _fat(ano: int, mes: int) -> float:
+        return por_mes.get((ano, mes), {}).get("fat", 0.0)
 
     def _meta(ano: int, mes: int):
         if meta_pct is None:
             return None
-        base = por_mes.get((ano - 1, mes))
+        base = _fat(ano - 1, mes)
         return round(base * (1 + meta_pct / 100), 2) if base else None
+
+    def _extras(ano: int, mes: int) -> dict:
+        m = por_mes.get((ano, mes))
+        if not m:
+            return {}
+        return {"itens": m["itens"], "cupons": m["cupons"],
+                "margem": round(m["margem"], 2)}
 
     meses = []
     # 12 meses fechados antes do corrente
     for d in range(-12, 0):
         ay, am = _add_meses(a0, m0, d)
-        meses.append({"mes": f"{ay}-{am:02d}", "tipo": "fechado",
-                      "realizado": round(por_mes.get((ay, am), 0.0), 2),
-                      "meta": _meta(ay, am)})
+        item = {"mes": f"{ay}-{am:02d}", "tipo": "fechado",
+                "realizado": round(_fat(ay, am), 2), "meta": _meta(ay, am)}
+        item.update(_extras(ay, am))
+        meses.append(item)
     # mês corrente: realizado até a âncora + projeção do restante
     fcm = fc.forecast_mes(hist, a0, m0, cutoff=ancora)
-    meses.append({"mes": f"{a0}-{m0:02d}", "tipo": "corrente",
-                  "realizado": fcm["total_realizado"],
-                  "previsto_restante": fcm["total_previsto"],
-                  "projetado": fcm["total_projetado"],
-                  "meta": _meta(a0, m0)})
-    # próximos 3 meses: média por dia-da-semana das últimas 8 semanas
+    corrente = {"mes": f"{a0}-{m0:02d}", "tipo": "corrente",
+                "realizado": fcm["total_realizado"],
+                "previsto_restante": fcm["total_previsto"],
+                "projetado": fcm["total_projetado"],
+                "meta": _meta(a0, m0)}
+    corrente.update(_extras(a0, m0))
+    meses.append(corrente)
+    # próximos meses: média por dia-da-semana das últimas 8 semanas
     base56 = [h for h in hist if h["data"] >= ancora - _td(days=56)]
-    for d in range(1, 4):
+    for d in range(1, fut + 1):
         ay, am = _add_meses(a0, m0, d)
         dias = fc.prever_dias(base56, _date(ay, am, 1),
                               _date(ay, am, _cal2.monthrange(ay, am)[1]))
@@ -1647,3 +1678,507 @@ def fca_delete(fid: str, user: dict = Depends(current), tid: str = Depends(tenan
         if cur.rowcount == 0:
             raise HTTPException(404, "Ciclo não encontrado.")
     return {"ok": True}
+
+
+# ═══════════════════════════ governança (handoff v2) ═══════════════════════════
+# Rituais de gestão, sala do conselho, iniciativas do plano tático e as
+# jornadas guiadas do Advisor (Método Masi: cultura e posicionamento).
+
+class RitualIn(BaseModel):
+    freq: str = "SEM"                    # DIA | SEM | MES | TRI
+    nome: str
+    quem: Optional[str] = None
+    objetivo: Optional[str] = None
+    proxima: Optional[str] = None
+
+
+RITUAIS_PADRAO = [
+    ("DIA", "Daily da loja · 15 min", "gerentes + operação", "desbloquear o dia", "seg–sáb 8h"),
+    ("SEM", "Semanal de resultados · 1h", "diretoria", "revisar ações e FCAs", "toda terça 9h"),
+    ("MES", "Mensal de OKRs · 2h", "CEO + diretoria", "FCA dos desvios, ajustar plano", "1ª quinta 14h"),
+    ("TRI", "Trimestral do conselho · 3h", "conselho + diretoria", "resultados, deliberações, rota", "a agendar"),
+]
+
+
+@app.get("/rituais")
+def rituais_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT id, freq, nome, quem, objetivo, proxima FROM ritual "
+                    "ORDER BY array_position(ARRAY['DIA','SEM','MES','TRI'], freq), ordem")
+        rituais = [{"id": str(r[0]), "freq": r[1], "nome": r[2], "quem": r[3],
+                    "objetivo": r[4], "proxima": r[5]} for r in cur.fetchall()]
+    return {"rituais": rituais}
+
+
+@app.post("/rituais/padrao")
+def rituais_padrao(user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    """Cria os 4 rituais padrão do método (só se ainda não houver nenhum)."""
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT count(*) FROM ritual")
+        if cur.fetchone()[0]:
+            raise HTTPException(409, "Já existem rituais cadastrados.")
+        for i, (fq, nm, qm, ob, px) in enumerate(RITUAIS_PADRAO):
+            cur.execute("INSERT INTO ritual (tenant_id, freq, nome, quem, objetivo, proxima, ordem) "
+                        "VALUES (%s,%s,%s,%s,%s,%s,%s)", (tid, fq, nm, qm, ob, px, i))
+    return {"ok": True}
+
+
+@app.post("/rituais")
+def rituais_post(body: RitualIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if not body.nome.strip():
+        raise HTTPException(400, "Dê um nome ao ritual.")
+    with tenant_session(tid) as cur:
+        cur.execute("INSERT INTO ritual (tenant_id, freq, nome, quem, objetivo, proxima) "
+                    "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+                    (tid, body.freq, body.nome.strip(), body.quem, body.objetivo, body.proxima))
+        rid = cur.fetchone()[0]
+    return {"id": str(rid)}
+
+
+@app.put("/rituais/{rid}")
+def rituais_put(rid: str, body: RitualIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("UPDATE ritual SET freq=%s, nome=%s, quem=%s, objetivo=%s, proxima=%s WHERE id=%s",
+                    (body.freq, body.nome.strip(), body.quem, body.objetivo, body.proxima, rid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Ritual não encontrado.")
+    return {"ok": True}
+
+
+@app.delete("/rituais/{rid}")
+def rituais_delete(rid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM ritual WHERE id=%s", (rid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Ritual não encontrado.")
+    return {"ok": True}
+
+
+# ------------------------------------------------ membros (diretoria/conselho)
+class MembroIn(BaseModel):
+    nome: str
+    papel: Optional[str] = None
+    tag: str = "diretoria"               # diretoria | conselho
+
+
+@app.get("/governanca/membros")
+def membros_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT id, nome, papel, tag FROM governanca_membro "
+                    "ORDER BY (tag <> 'diretoria'), ordem, nome")
+        membros = [{"id": str(r[0]), "nome": r[1], "papel": r[2], "tag": r[3]}
+                   for r in cur.fetchall()]
+    return {"membros": membros}
+
+
+@app.post("/governanca/membros")
+def membros_post(body: MembroIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if not body.nome.strip():
+        raise HTTPException(400, "Informe o nome.")
+    if body.tag not in ("diretoria", "conselho"):
+        raise HTTPException(400, "Tag deve ser diretoria ou conselho.")
+    with tenant_session(tid) as cur:
+        cur.execute("INSERT INTO governanca_membro (tenant_id, nome, papel, tag) "
+                    "VALUES (%s,%s,%s,%s) RETURNING id",
+                    (tid, body.nome.strip(), body.papel, body.tag))
+        mid = cur.fetchone()[0]
+    return {"id": str(mid)}
+
+
+@app.put("/governanca/membros/{mid}")
+def membros_put(mid: str, body: MembroIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("UPDATE governanca_membro SET nome=%s, papel=%s, tag=%s WHERE id=%s",
+                    (body.nome.strip(), body.papel, body.tag, mid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Membro não encontrado.")
+    return {"ok": True}
+
+
+@app.delete("/governanca/membros/{mid}")
+def membros_delete(mid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM governanca_membro WHERE id=%s", (mid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Membro não encontrado.")
+    return {"ok": True}
+
+
+# ------------------------------------------------ reuniões do conselho + pauta
+class PautaItemIn(BaseModel):
+    item: str
+    tempo: Optional[str] = None
+    material: Optional[str] = None
+
+
+class ReuniaoIn(BaseModel):
+    titulo: str = "Reunião trimestral do conselho"
+    data: Optional[str] = None
+    hora: Optional[str] = None
+    local: Optional[str] = None
+    status: str = "agendada"             # agendada | realizada
+    assinada: bool = False
+    pauta: Optional[list] = None         # [{item, tempo, material}]
+
+
+def _reuniao_row(cur, rid):
+    cur.execute("SELECT id, titulo, data, hora, local, status, assinada "
+                "FROM conselho_reuniao WHERE id=%s", (rid,))
+    r = cur.fetchone()
+    if not r:
+        return None
+    cur.execute("SELECT id, item, tempo, material FROM conselho_pauta "
+                "WHERE reuniao_id=%s ORDER BY ordem", (rid,))
+    pauta = [{"id": str(p[0]), "item": p[1], "tempo": p[2], "material": p[3]}
+             for p in cur.fetchall()]
+    return {"id": str(r[0]), "titulo": r[1], "data": str(r[2]) if r[2] else None,
+            "hora": r[3], "local": r[4], "status": r[5], "assinada": r[6],
+            "pauta": pauta}
+
+
+@app.get("/conselho/reunioes")
+def reunioes_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT id FROM conselho_reuniao ORDER BY data DESC NULLS LAST, criado_em DESC")
+        ids = [r[0] for r in cur.fetchall()]
+        reunioes = [_reuniao_row(cur, i) for i in ids]
+    return {"reunioes": reunioes}
+
+
+@app.post("/conselho/reunioes")
+def reunioes_post(body: ReuniaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("INSERT INTO conselho_reuniao (tenant_id, titulo, data, hora, local, status, assinada) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                    (tid, body.titulo.strip(), body.data or None, body.hora, body.local,
+                     body.status, body.assinada))
+        rid = cur.fetchone()[0]
+        for i, p in enumerate(body.pauta or []):
+            cur.execute("INSERT INTO conselho_pauta (tenant_id, reuniao_id, item, tempo, material, ordem) "
+                        "VALUES (%s,%s,%s,%s,%s,%s)",
+                        (tid, rid, p.get("item", ""), p.get("tempo"), p.get("material"), i))
+        reuniao = _reuniao_row(cur, rid)
+    return reuniao
+
+
+@app.put("/conselho/reunioes/{rid}")
+def reunioes_put(rid: str, body: ReuniaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("UPDATE conselho_reuniao SET titulo=%s, data=%s, hora=%s, local=%s, "
+                    "status=%s, assinada=%s WHERE id=%s",
+                    (body.titulo.strip(), body.data or None, body.hora, body.local,
+                     body.status, body.assinada, rid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Reunião não encontrada.")
+        if body.pauta is not None:       # pauta enviada substitui a atual
+            cur.execute("DELETE FROM conselho_pauta WHERE reuniao_id=%s", (rid,))
+            for i, p in enumerate(body.pauta):
+                cur.execute("INSERT INTO conselho_pauta (tenant_id, reuniao_id, item, tempo, material, ordem) "
+                            "VALUES (%s,%s,%s,%s,%s,%s)",
+                            (tid, rid, p.get("item", ""), p.get("tempo"), p.get("material"), i))
+        reuniao = _reuniao_row(cur, rid)
+    return reuniao
+
+
+@app.delete("/conselho/reunioes/{rid}")
+def reunioes_delete(rid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM conselho_reuniao WHERE id=%s", (rid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Reunião não encontrada.")
+    return {"ok": True}
+
+
+@app.post("/conselho/reunioes/{rid}/caderno")
+def reuniao_caderno(rid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    """Caderno da reunião: compila plano, resultados, FCAs e deliberações num
+    texto pronto para circular antes do encontro (IA quando disponível)."""
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        reuniao = _reuniao_row(cur, rid)
+        if not reuniao:
+            raise HTTPException(404, "Reunião não encontrada.")
+        cur.execute("SELECT titulo, status FROM okr_objetivo ORDER BY criado_em")
+        objetivos = cur.fetchall()
+        cur.execute("SELECT titulo, status, responsavel, prazo FROM fca_ciclo "
+                    "WHERE status IN ('aberto','em_andamento') ORDER BY criado_em DESC LIMIT 6")
+        fcas = cur.fetchall()
+        cur.execute("SELECT texto, status, follow FROM deliberacao ORDER BY data DESC NULLS LAST LIMIT 8")
+        delibs = cur.fetchall()
+        yoy = _yoy_do_ultimo_mes(cur)
+
+    linhas = [f"CADERNO — {reuniao['titulo']}",
+              f"Data: {reuniao['data'] or 'a agendar'} · {reuniao['hora'] or ''} · {reuniao['local'] or ''}", ""]
+    if yoy:
+        linhas.append(f"Resultado do último mês: civil {yoy['var_civil']*100:+.1f}% · "
+                      f"varejo (ajustado) {yoy['var_ajustada']*100:+.1f}% vs. ano anterior.")
+    if reuniao["pauta"]:
+        linhas.append("")
+        linhas.append("PAUTA")
+        for p in reuniao["pauta"]:
+            linhas.append(f"  • {p['item']} ({p['tempo'] or 's/ tempo'}) — material: {p['material'] or '—'}")
+    if objetivos:
+        linhas.append("")
+        linhas.append("OKRS DO CICLO")
+        for t, _ in objetivos:
+            linhas.append(f"  • {t}")
+    if fcas:
+        linhas.append("")
+        linhas.append("FCAS EM CURSO")
+        for t, st, resp, prazo in fcas:
+            linhas.append(f"  • {t} — {st} (dono: {resp or '—'}, prazo: {prazo or '—'})")
+    if delibs:
+        linhas.append("")
+        linhas.append("DELIBERAÇÕES")
+        for t, st, fu in delibs:
+            linhas.append(f"  • {t} — {st}" + (f" · follow-up: {fu}" if fu else ""))
+    base = "\n".join(linhas)
+    texto = advisor._chamada(
+        "Você é o Advisor do BoardOS. Transforme o rascunho abaixo num caderno de reunião "
+        "de conselho claro e executivo, em português, com seções e leitura fluida. "
+        "Não invente números que não estão no rascunho.", base, 1500) if advisor.disponivel() else None
+    return {"caderno": texto or base, "fonte": "ia" if texto else "modelo"}
+
+
+# ------------------------------------------------------------- deliberações
+class DeliberacaoIn(BaseModel):
+    texto: str
+    data: Optional[str] = None
+    status: str = "em_pauta"             # em_pauta | aprovada | concluida
+    follow: Optional[str] = None
+
+
+@app.get("/deliberacoes")
+def deliberacoes_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT id, texto, data, status, follow FROM deliberacao "
+                    "ORDER BY (status='concluida'), data DESC NULLS LAST")
+        rows = [{"id": str(r[0]), "texto": r[1], "data": str(r[2]) if r[2] else None,
+                 "status": r[3], "follow": r[4]} for r in cur.fetchall()]
+    return {"deliberacoes": rows}
+
+
+@app.post("/deliberacoes")
+def deliberacoes_post(body: DeliberacaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if not body.texto.strip():
+        raise HTTPException(400, "Descreva a deliberação.")
+    with tenant_session(tid) as cur:
+        cur.execute("INSERT INTO deliberacao (tenant_id, texto, data, status, follow) "
+                    "VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                    (tid, body.texto.strip(), body.data or None, body.status, body.follow))
+        did = cur.fetchone()[0]
+    return {"id": str(did)}
+
+
+@app.put("/deliberacoes/{did}")
+def deliberacoes_put(did: str, body: DeliberacaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("UPDATE deliberacao SET texto=%s, data=%s, status=%s, follow=%s WHERE id=%s",
+                    (body.texto.strip(), body.data or None, body.status, body.follow, did))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Deliberação não encontrada.")
+    return {"ok": True}
+
+
+@app.delete("/deliberacoes/{did}")
+def deliberacoes_delete(did: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM deliberacao WHERE id=%s", (did,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Deliberação não encontrada.")
+    return {"ok": True}
+
+
+# ----------------------------------------------- iniciativas (plano tático)
+class IniciativaIn(BaseModel):
+    nome: str
+    objetivo_id: Optional[str] = None
+    dono: Optional[str] = None
+    orcamento: Optional[float] = None
+
+
+@app.get("/iniciativas")
+def iniciativas_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT i.id, i.nome, i.objetivo_id, o.titulo, i.dono, i.orcamento "
+                    "FROM iniciativa i LEFT JOIN okr_objetivo o ON o.id=i.objetivo_id "
+                    "ORDER BY i.nome")
+        inis = [{"id": str(r[0]), "nome": r[1],
+                 "objetivo_id": str(r[2]) if r[2] else None, "objetivo": r[3],
+                 "dono": r[4], "orcamento": float(r[5]) if r[5] is not None else None,
+                 "acoes": []} for r in cur.fetchall()]
+        por_id = {i["id"]: i for i in inis}
+        cur.execute("SELECT iniciativa_id, id, oque, como, quem, quando, quanto, status "
+                    "FROM acao_5w2h WHERE iniciativa_id IS NOT NULL ORDER BY quando NULLS LAST")
+        for iid, aid, oq, cm, qm, qd, qt, st in cur.fetchall():
+            i = por_id.get(str(iid))
+            if i is not None:
+                i["acoes"].append({"id": str(aid), "oque": oq, "como": cm, "quem": qm,
+                                   "quando": str(qd) if qd else None,
+                                   "quanto": float(qt) if qt is not None else None,
+                                   "status": st})
+    return {"iniciativas": inis}
+
+
+@app.post("/iniciativas")
+def iniciativas_post(body: IniciativaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    if not body.nome.strip():
+        raise HTTPException(400, "Dê um nome à iniciativa.")
+    with tenant_session(tid) as cur:
+        cur.execute("INSERT INTO iniciativa (tenant_id, nome, objetivo_id, dono, orcamento) "
+                    "VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                    (tid, body.nome.strip(), body.objetivo_id or None, body.dono, body.orcamento))
+        iid = cur.fetchone()[0]
+    return {"id": str(iid)}
+
+
+@app.put("/iniciativas/{iid}")
+def iniciativas_put(iid: str, body: IniciativaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("UPDATE iniciativa SET nome=%s, objetivo_id=%s, dono=%s, orcamento=%s WHERE id=%s",
+                    (body.nome.strip(), body.objetivo_id or None, body.dono, body.orcamento, iid))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Iniciativa não encontrada.")
+    return {"ok": True}
+
+
+@app.delete("/iniciativas/{iid}")
+def iniciativas_delete(iid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("DELETE FROM iniciativa WHERE id=%s", (iid,))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Iniciativa não encontrada.")
+    return {"ok": True}
+
+
+# --------------------------------- jornadas guiadas do Advisor (Método Masi)
+JORNADAS = {
+    "cultura": {
+        "nome": "Cultura Organizacional",
+        "desc": "13 perguntas sobre a cultura atual e desejada → guia interno + manifesto.",
+        "perguntas": [
+            {"k": "c1", "q": "Você já sente que existe uma cultura na sua empresa? Se sim, como você descreveria essa cultura hoje?"},
+            {"k": "c2", "q": "As pessoas do seu time vivem essa cultura no dia a dia? Por quê?"},
+            {"k": "c3", "q": "Que comportamentos você percebe que são mais comuns no time atualmente?"},
+            {"k": "c4", "q": "Que tipo de atitude é valorizada dentro da sua empresa, mesmo que informalmente?"},
+            {"k": "c5", "q": "O que vocês costumam considerar como um “bom profissional” por aí?"},
+            {"k": "c6", "q": "Agora vamos olhar para o futuro: como você gostaria que fosse a cultura da sua empresa?"},
+            {"k": "c7", "q": "Quais comportamentos e atitudes você gostaria de reforçar?"},
+            {"k": "c8", "q": "E quais você gostaria de eliminar ou mudar?"},
+            {"k": "c9", "q": "Que valores você acredita que não podem faltar na cultura da sua empresa?"},
+            {"k": "c10", "q": "O que você espera que todas as pessoas do time pratiquem no dia a dia?"},
+        ],
+        "system": ("Você é o Conselheiro do BoardOS guiando a construção da Cultura Organizacional "
+                   "de uma rede de supermercados (Método MASI). A partir das respostas do empresário, "
+                   "gere um GUIA INTERNO com: descrição geral da cultura desejada; valores principais; "
+                   "comportamentos e atitudes esperadas; o que será tolerado ou não; o que define um "
+                   "\"bom profissional\"; gaps entre a cultura atual e a desejada. Depois, escreva um "
+                   "MANIFESTO em primeira pessoa, com tom emocional, linguagem de liderança e clareza "
+                   "inspiradora, para o dono compartilhar com a equipe. Português, direto, sem inventar fatos."),
+    },
+    "posicionamento": {
+        "nome": "Posicionamento",
+        "desc": "“O que minha empresa faz?” — clareza para clientes, time e conselho.",
+        "perguntas": [
+            {"k": "p1", "q": "O que exatamente vocês vendem (produto, serviço ou solução)?"},
+            {"k": "p2", "q": "Qual problema real do cliente vocês resolvem?"},
+            {"k": "p3", "q": "Quem é o cliente ideal (perfil, segmento, porte)?"},
+            {"k": "p4", "q": "Como vocês entregam valor na prática?"},
+            {"k": "p5", "q": "O que diferencia sua empresa da concorrência?"},
+            {"k": "p6", "q": "Qual é o principal resultado que o cliente obtém?"},
+            {"k": "p7", "q": "Qual é o modelo de receita (como ganham dinheiro)?"},
+            {"k": "p8", "q": "Onde atuam (região, online, nacional, nicho)?"},
+            {"k": "p9", "q": "Qual é a visão futura ou objetivo principal do negócio?"},
+            {"k": "p10", "q": "Há algo que hoje fica vago quando você explica a empresa para alguém de fora?"},
+        ],
+        "system": ("Você é um especialista em estratégia e comunicação empresarial (Método MASI). "
+                   "A partir das respostas, produza um documento claro com: 1. Resumo executivo (3–5 linhas); "
+                   "2. O que a empresa faz; 3. Problema que resolve; 4. Público-alvo; 5. Diferenciais "
+                   "competitivos; 6. Como ganha dinheiro; 7. Posicionamento resumido numa frase simples. "
+                   "Linguagem simples, sem jargão, sem inventar fatos."),
+    },
+}
+
+
+class JornadaIn(BaseModel):
+    respostas: Dict[str, str]
+
+
+@app.get("/jornadas")
+def jornadas_get(tid: str = Depends(tenant_of)):
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT jornada, respostas, resumo FROM jornada")
+        salvas = {r[0]: {"respostas": r[1] or {}, "resumo": r[2]} for r in cur.fetchall()}
+        # a jornada de Direção é a Descoberta já existente
+        cur.execute("SELECT respostas FROM descoberta WHERE tenant_id=%s", (tid,))
+        row = cur.fetchone()
+        desc_resp = (row[0] if row else {}) or {}
+    out = []
+    for k, j in JORNADAS.items():
+        s = salvas.get(k, {"respostas": {}, "resumo": None})
+        resp = s["respostas"]
+        n = sum(1 for p in j["perguntas"] if (resp.get(p["k"]) or "").strip())
+        out.append({"jornada": k, "nome": j["nome"], "desc": j["desc"],
+                    "perguntas": j["perguntas"], "respostas": resp,
+                    "respondidas": n, "total": len(j["perguntas"]),
+                    "resumo": s["resumo"]})
+    n_desc = sum(1 for v in desc_resp.values() if (v or "").strip())
+    return {"jornadas": out, "descoberta_respondidas": n_desc}
+
+
+@app.put("/jornadas/{jkey}")
+def jornadas_put(jkey: str, body: JornadaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    import json as _json
+    _can_edit(user)
+    if jkey not in JORNADAS:
+        raise HTTPException(404, "Jornada desconhecida.")
+    with tenant_session(tid) as cur:
+        cur.execute("INSERT INTO jornada (tenant_id, jornada, respostas, atualizado_em) "
+                    "VALUES (%s,%s,%s,now()) ON CONFLICT (tenant_id, jornada) DO UPDATE SET "
+                    "respostas=EXCLUDED.respostas, atualizado_em=now()",
+                    (tid, jkey, _json.dumps(body.respostas)))
+    return {"ok": True}
+
+
+@app.post("/jornadas/{jkey}/resumo")
+def jornadas_resumo(jkey: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    _can_edit(user)
+    j = JORNADAS.get(jkey)
+    if not j:
+        raise HTTPException(404, "Jornada desconhecida.")
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT respostas FROM jornada WHERE tenant_id=%s AND jornada=%s", (tid, jkey))
+        row = cur.fetchone()
+        respostas = (row[0] if row else {}) or {}
+        respondidas = [(p["q"], respostas.get(p["k"], "").strip())
+                       for p in j["perguntas"] if (respostas.get(p["k"]) or "").strip()]
+        if len(respondidas) < len(j["perguntas"]) // 2:
+            raise HTTPException(400, "Responda ao menos metade das perguntas antes de gerar o material.")
+        qa = "\n\n".join(f"P: {q}\nR: {r}" for q, r in respondidas)
+        texto = advisor._chamada(j["system"], qa, 1800) if advisor.disponivel() else None
+        if not texto:
+            # fallback sem IA: organiza as respostas em material legível
+            texto = (f"{j['nome'].upper()} — material de trabalho (gere com IA para a versão final)\n\n"
+                     + "\n\n".join(f"• {q}\n  {r}" for q, r in respondidas))
+            fonte = "modelo"
+        else:
+            fonte = "ia"
+        cur.execute("UPDATE jornada SET resumo=%s, atualizado_em=now() "
+                    "WHERE tenant_id=%s AND jornada=%s", (texto, tid, jkey))
+    return {"resumo": texto, "fonte": fonte}
