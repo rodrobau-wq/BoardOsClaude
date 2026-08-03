@@ -19,8 +19,8 @@ services:
     healthCheckPath: /health
     buildCommand: pip install -r requirements.txt
     # migrate.py é idempotente (registra migrações aplicadas) → seguro a cada deploy.
-    # migrate (crítico) → onboarding demo (best-effort, não bloqueia) → API
-    startCommand: python scripts/migrate.py && (python scripts/onboard_crm_demo.py || echo "onboard demo skip") && uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    # Sem onboarding demo no boot: a base é de produção (só a Minha Rede).
+    startCommand: python scripts/migrate.py && uvicorn api.main:app --host 0.0.0.0 --port $PORT
     envVars:
       # A app conecta no banco gerenciado. FORCE ROW LEVEL SECURITY garante que,
       # mesmo conectando como owner, o isolamento por tenant continua valendo.
