@@ -507,7 +507,7 @@ def _lojas_mes(cur, ano: int, mes: int):
     """Faturamento + variação YoY (civil/ajustada) por loja no mês."""
     cur.execute(
         """
-        SELECT l.id, l.nome, g.data, g.faturamento_liq, g.cupons, g.itens
+        SELECT l.id, l.nome, g.data, g.faturamento_liq, g.cupons, g.itens, g.margem
           FROM gold_venda_diaria g JOIN loja l ON l.id = g.loja_id
          WHERE g.categoria_id IS NULL
            AND date_trunc('month', g.data) IN (make_date(%s,%s,1), make_date(%s,%s,1))
@@ -516,17 +516,21 @@ def _lojas_mes(cur, ano: int, mes: int):
         (ano, mes, ano - 1, mes),
     )
     por_loja: dict = {}
-    for lid, nome, d, fat, cup, itn in cur.fetchall():
+    for lid, nome, d, fat, cup, itn, mrg in cur.fetchall():
         key = str(lid)
         por_loja.setdefault(key, {"nome": nome, "atual": [], "base": []})
         rec = {"data": d, "faturamento_liq": float(fat),
-               "cupons": int(cup), "itens": int(itn)}
+               "cupons": int(cup), "itens": int(itn), "margem": float(mrg or 0)}
         (por_loja[key]["atual"] if d.year == ano else por_loja[key]["base"]).append(rec)
 
     lojas = []
     for lid, v in por_loja.items():
         fat = sum(r["faturamento_liq"] for r in v["atual"])
+        cup = sum(r["cupons"] for r in v["atual"])
+        mrg = sum(r["margem"] for r in v["atual"])
         item = {"id": lid, "nome": v["nome"], "faturamento": round(fat, 2),
+                "ticket": round(fat / cup, 2) if cup else None,
+                "margem_pct": round(mrg / fat, 4) if fat and 0 < mrg < fat else None,
                 "var_civil": None, "var_ajustada": None}
         if v["atual"] and v["base"]:
             r = comparison.compare(v["atual"], v["base"])
@@ -936,6 +940,7 @@ async def dados_importar(
                 loja_nome=loja_nome.strip() or ("Loja " + loja_codigo.strip()),
                 csv_path=tmp.name,
                 cmap=cmap,
+                origem=arquivo.filename or "importacao.csv",
             )
         except ValueError as e:
             raise HTTPException(400, str(e))
@@ -990,7 +995,29 @@ def dados_importar_diario(body: ImportDiarioIn, user: dict = Depends(current),
         _cal(cur, dmin.replace(month=1, day=1), dmax.replace(month=12, day=31))
     from boardos.crm import import_vendas_diarias_rows
     res = import_vendas_diarias_rows(tid, records, margem_sintetica=False)
+    # registra o lote para a lista de importações do painel
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "INSERT INTO ingest_batch (tenant_id, origem, data_de, data_ate, linhas, status) "
+            "VALUES (%s,%s,%s,%s,%s,'ok')",
+            (tid, "importação diária (API)", dmin, dmax, len(records)))
     return {"ok": True, "linhas": res["linhas"]}
+
+
+@app.get("/dados/importacoes")
+def dados_importacoes(tid: str = Depends(tenant_of)):
+    """Histórico de importações do tenant (mais recentes primeiro)."""
+    with tenant_session(tid) as cur:
+        cur.execute(
+            "SELECT b.origem, b.data_de, b.data_ate, b.linhas, b.status, b.criado_em, l.nome "
+            "FROM ingest_batch b LEFT JOIN loja l ON l.id = b.loja_id "
+            "ORDER BY b.criado_em DESC LIMIT 60")
+        rows = cur.fetchall()
+    return {"importacoes": [
+        {"arquivo": o or "—", "data_de": str(de) if de else None,
+         "data_ate": str(ate) if ate else None, "registros": int(n or 0),
+         "status": st, "enviado_em": env.isoformat(), "loja": lj}
+        for o, de, ate, n, st, env, lj in rows]}
 
 
 # ------------------------------------------------- gestão de usuários
@@ -1479,7 +1506,8 @@ def categorias_resumo(ano: int, mes: int, loja_id: Optional[str] = None,
     with tenant_session(tid) as cur:
         cur.execute(
             """
-            SELECT c.id, c.nome, g.data, sum(g.faturamento_liq), sum(g.cupons), sum(g.itens)
+            SELECT c.id, c.nome, g.data, sum(g.faturamento_liq), sum(g.cupons), sum(g.itens),
+                   sum(g.margem)
               FROM gold_venda_diaria g JOIN categoria c ON c.id = g.categoria_id
              WHERE date_trunc('month', g.data) IN (make_date(%s,%s,1), make_date(%s,%s,1))
              """ + filtro_loja + """
@@ -1487,17 +1515,19 @@ def categorias_resumo(ano: int, mes: int, loja_id: Optional[str] = None,
             """,
             params)
         por_cat: dict = {}
-        for cid, nome, d, fat, cup, itn in cur.fetchall():
+        for cid, nome, d, fat, cup, itn, mrg in cur.fetchall():
             key = str(cid)
             por_cat.setdefault(key, {"nome": nome, "atual": [], "base": []})
             rec = {"data": d, "faturamento_liq": float(fat),
-                   "cupons": int(cup), "itens": int(itn)}
+                   "cupons": int(cup), "itens": int(itn), "margem": float(mrg or 0)}
             (por_cat[key]["atual"] if d.year == ano else por_cat[key]["base"]).append(rec)
 
     cats = []
     for v in por_cat.values():
         fat = sum(r["faturamento_liq"] for r in v["atual"])
+        mrg = sum(r["margem"] for r in v["atual"])
         item = {"nome": v["nome"], "faturamento": round(fat, 2),
+                "margem_pct": round(mrg / fat, 4) if fat and 0 < mrg < fat else None,
                 "var_civil": None, "var_ajustada": None}
         if v["atual"] and v["base"]:
             r = comparison.compare(v["atual"], v["base"])

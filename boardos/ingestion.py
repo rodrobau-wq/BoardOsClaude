@@ -12,6 +12,7 @@ está em scripts/demo_local.py.
 from __future__ import annotations
 
 import csv
+import os
 import uuid
 from datetime import date
 from typing import Dict, Iterable, Tuple
@@ -41,8 +42,10 @@ def ingest_csv(
     loja_nome: str,
     csv_path: str,
     cmap: ColumnMap,
+    origem: str | None = None,
 ) -> Dict:
-    """Ingere um CSV para um tenant/loja. Retorna resumo (linhas, dias, novos itens)."""
+    """Ingere um CSV para um tenant/loja. Retorna resumo (linhas, dias, novos itens).
+    `origem` é o nome exibível do arquivo (o painel lista as importações por ele)."""
     missing = cmap.missing_required()
     if missing:
         raise ValueError(f"Colunas obrigatórias não mapeadas: {missing}")
@@ -56,7 +59,7 @@ def ingest_csv(
         cur.execute(
             "INSERT INTO ingest_batch (id, tenant_id, origem, loja_id, status) "
             "VALUES (%s,%s,%s,%s,'processando')",
-            (batch_id, tenant_id, csv_path, loja_id),
+            (batch_id, tenant_id, origem or os.path.basename(csv_path), loja_id),
         )
 
         dias_afetados: set = set()
