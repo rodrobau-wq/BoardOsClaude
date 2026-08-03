@@ -1341,11 +1341,12 @@ async function refreshImportacoes(){
     }
     box.innerHTML = imps.map(function(im){
       var st = IMP_ST[im.status] || {txt:(im.status||"—").toUpperCase(), cls:"pa"};
+      var nome = (im.arquivo||"—").split("/").pop();   // lotes antigos guardavam o caminho temporário
       var per = im.data_de ? fmtDataBr(im.data_de)+" – "+fmtDataBr(im.data_ate) : "—";
       var env = im.enviado_em
         ? new Date(im.enviado_em).toLocaleString("pt-BR",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}) : "—";
       return '<div class="grow" style="grid-template-columns:1.6fr 1fr 1fr 1fr 1fr">'
-        + '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+im.arquivo+'">'+im.arquivo+'</span>'
+        + '<span style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+im.arquivo+'">'+nome+'</span>'
         + '<span style="color:var(--muted)">'+per+'</span>'
         + '<span class="tr">'+(+im.registros||0).toLocaleString("pt-BR")+'</span>'
         + '<span style="color:var(--muted)">'+env+'</span>'
