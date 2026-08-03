@@ -3301,22 +3301,46 @@ function renderRede(){
   mandarLojasAoMapa();
   renderDemografia();
 }
+var DEMO_CACHE = {};
 function renderDemografia(){
   var l = lojasCache.filter(function(x){ return x.id === REDE_SEL; })[0] || lojasCache[0];
   if(!l){ el("demoBox").innerHTML = '<span class="hint">Selecione uma loja.</span>'; return; }
   el("demoTitulo").textContent = "Demografia — " + l.nome;
+  var d = DEMO_CACHE[l.id];
+  if(d === undefined){
+    DEMO_CACHE[l.id] = null;   // marcando "buscando"
+    el("demoBox").innerHTML = '<span class="hint">Carregando os anéis do Censo…</span>';
+    jget("/lojas/"+l.id+"/demografia").then(function(r){
+      DEMO_CACHE[l.id] = r.aneis || [];
+      if(REDE_SEL === l.id || (!REDE_SEL && lojasCache[0] && lojasCache[0].id === l.id)) renderDemografia();
+    }).catch(function(){ DEMO_CACHE[l.id] = []; renderDemografia(); });
+    return;
+  }
+  if(d === null){ return; }
+  var linhas = [];
+  var NOMES = {primaria:["Primária","var(--accent-strong)"], secundaria:["Secundária","var(--accent)"], terciaria:["Terciária","var(--muted)"]};
+  if(d.length){
+    // tabela P/S/T do protótipo: população · domicílios · potencial/ano
+    linhas.push('<div style="display:grid;grid-template-columns:1fr .9fr .9fr 1.1fr;gap:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);padding-bottom:4px;border-bottom:1px solid var(--border)">'
+      + '<span>Área</span><span class="tr">População</span><span class="tr">Domicílios</span><span class="tr">Potencial/ano</span></div>');
+    d.forEach(function(a){
+      var nm = NOMES[a.anel] || [a.anel, "var(--muted)"];
+      linhas.push('<div style="display:grid;grid-template-columns:1fr .9fr .9fr 1.1fr;gap:8px;font-size:12.5px;align-items:center" class="num">'
+        + '<span><b style="color:'+nm[1]+'">'+nm[0]+'</b><span style="display:block;color:var(--faint);font-size:10.5px">até '+(a.raio_km||"—")+' km</span></span>'
+        + '<span class="tr">'+a.populacao.toLocaleString("pt-BR")+'</span>'
+        + '<span class="tr">'+a.domicilios.toLocaleString("pt-BR")+'</span>'
+        + '<span class="tr" style="font-weight:600;color:var(--accent-strong)">'+(a.potencial_ano!=null?brl(a.potencial_ano):"—")+'</span></div>');
+    });
+    if(d[0].fonte) linhas.push('<span style="color:var(--faint);font-size:10.5px;margin-top:2px">'+d[0].fonte+'</span>');
+  } else {
+    linhas.push('<span class="hint">Anéis ainda não calculados para esta loja — rode <b>scripts/demografia_ibge.py</b> (precisa de lat/lng na loja).</span>');
+  }
   var pop = l.populacao ? (+l.populacao).toLocaleString("pt-BR") : null;
   var pib = l.pib_per_capita ? "R$ "+(+l.pib_per_capita).toLocaleString("pt-BR",{maximumFractionDigits:0}) : null;
-  var linhas = [];
   if(pop || pib){
-    linhas.push('<div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Município ('+(l.municipio||"—")+(l.uf?"/"+l.uf:"")+')</span><span></span></div>');
-    if(pop) linhas.push('<div style="display:flex;justify-content:space-between"><span>População'+(l.populacao_ano?' <span class="hint">(IBGE '+l.populacao_ano+')</span>':'')+'</span><b class="num">'+pop+'</b></div>');
-    if(pib) linhas.push('<div style="display:flex;justify-content:space-between"><span>PIB por habitante'+(l.pib_ano?' <span class="hint">(IBGE '+l.pib_ano+')</span>':'')+'</span><b class="num">'+pib+'</b></div>');
-  } else {
-    linhas.push('<span class="hint">Cadastre município/UF na loja para puxar o contexto do IBGE.</span>');
+    linhas.push('<div style="margin-top:6px;padding-top:8px;border-top:1px solid var(--border);color:var(--muted);font-size:11.5px">Município ('+(l.municipio||"—")+(l.uf?"/"+l.uf:"")+')'
+      + (pop?' · pop. <b class="num">'+pop+'</b>':'') + (pib?' · PIB/hab <b class="num">'+pib+'</b>':'') + '</div>');
   }
-  linhas.push('<div style="margin-top:6px;padding:10px 12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);font-size:11.5px;color:var(--faint)">'
-    + 'Áreas primária/secundária/terciária com população, domicílios, renda e potencial de consumo por setor censitário (Censo 2022 + POF/IBGE): <b>em breve</b> — requer a malha censitária por raio.</div>');
   el("demoBox").innerHTML = linhas.join("");
 }
 el("redeLojasLista").addEventListener("click", function(e){

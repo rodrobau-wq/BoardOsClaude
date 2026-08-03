@@ -2225,3 +2225,50 @@ def perfil_put(body: PerfilIn, user: dict = Depends(current)):
         except Exception:
             pass
     return {"ok": True}
+
+
+# ═══════════════════ demografia das áreas de influência ═══════════════════
+class DemografiaIn(BaseModel):
+    aneis: list                          # [{anel, raio_km, populacao, domicilios, setores, potencial_ano}]
+    fonte: Optional[str] = None
+
+
+@app.put("/lojas/{lid}/demografia")
+def demografia_put(lid: str, body: DemografiaIn, user: dict = Depends(current),
+                   tid: str = Depends(tenant_of)):
+    """Grava o agregado do Censo por anel (calculado pelo scripts/demografia_ibge.py)."""
+    _can_edit(user)
+    validos = {"primaria", "secundaria", "terciaria"}
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT 1 FROM loja WHERE id=%s", (lid,))
+        if not cur.fetchone():
+            raise HTTPException(404, "Loja não encontrada.")
+        for a in body.aneis:
+            if a.get("anel") not in validos:
+                raise HTTPException(400, f"Anel inválido: {a.get('anel')}")
+            cur.execute(
+                "INSERT INTO loja_demografia (tenant_id, loja_id, anel, raio_km, populacao, "
+                "domicilios, setores, potencial_ano, fonte, calculado_em) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,now()) "
+                "ON CONFLICT (tenant_id, loja_id, anel) DO UPDATE SET "
+                "raio_km=EXCLUDED.raio_km, populacao=EXCLUDED.populacao, "
+                "domicilios=EXCLUDED.domicilios, setores=EXCLUDED.setores, "
+                "potencial_ano=EXCLUDED.potencial_ano, fonte=EXCLUDED.fonte, calculado_em=now()",
+                (tid, lid, a["anel"], a.get("raio_km"), int(a.get("populacao") or 0),
+                 int(a.get("domicilios") or 0), int(a.get("setores") or 0),
+                 a.get("potencial_ano"), body.fonte))
+    return {"ok": True}
+
+
+@app.get("/lojas/{lid}/demografia")
+def demografia_get(lid: str, tid: str = Depends(tenant_of)):
+    ordem = {"primaria": 0, "secundaria": 1, "terciaria": 2}
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT anel, raio_km, populacao, domicilios, setores, potencial_ano, "
+                    "fonte, calculado_em FROM loja_demografia WHERE loja_id=%s", (lid,))
+        rows = [{"anel": r[0], "raio_km": float(r[1]) if r[1] is not None else None,
+                 "populacao": int(r[2]), "domicilios": int(r[3]), "setores": int(r[4]),
+                 "potencial_ano": float(r[5]) if r[5] is not None else None,
+                 "fonte": r[6], "calculado_em": r[7].isoformat()} for r in cur.fetchall()]
+    rows.sort(key=lambda x: ordem.get(x["anel"], 9))
+    return {"aneis": rows}
