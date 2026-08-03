@@ -3415,7 +3415,8 @@ function fmtDeploy(iso){
     el("buildInfoLogin").innerHTML = partes.join(" · ");
   }
   pinta();
-  fetch(API + "/versao").then(function(r){ return r.json(); }).then(function(v){
+  fetch(API + "/versao").then(function(r){ if(!r.ok) throw 0; return r.json(); }).then(function(v){
+    if(!v.api) return;
     partes.push("API " + v.api + " · deploy " + fmtDeploy(v.deploy_em));
     pinta();
   }).catch(function(){});
