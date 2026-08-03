@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -523,9 +524,9 @@ def _lojas_mes(cur, ano: int, mes: int):
         (por_loja[key]["atual"] if d.year == ano else por_loja[key]["base"]).append(rec)
 
     lojas = []
-    for v in por_loja.values():
+    for lid, v in por_loja.items():
         fat = sum(r["faturamento_liq"] for r in v["atual"])
-        item = {"nome": v["nome"], "faturamento": round(fat, 2),
+        item = {"id": lid, "nome": v["nome"], "faturamento": round(fat, 2),
                 "var_civil": None, "var_ajustada": None}
         if v["atual"] and v["base"]:
             r = comparison.compare(v["atual"], v["base"])
@@ -1464,17 +1465,27 @@ def forecast_mes_api(ano: int, mes: int, tid: str = Depends(tenant_of)):
 
 
 @app.get("/categorias/resumo")
-def categorias_resumo(ano: int, mes: int, tid: str = Depends(tenant_of)):
-    """Drill-down por categoria no mês: faturamento, participação e YoY."""
+def categorias_resumo(ano: int, mes: int, loja_id: Optional[str] = None,
+                      tid: str = Depends(tenant_of)):
+    """Drill-down por categoria no mês: faturamento, participação e YoY.
+    Com loja_id, restringe às vendas daquela loja (drill loja → categorias)."""
+    if loja_id:
+        try:
+            uuid.UUID(loja_id)
+        except ValueError:
+            raise HTTPException(400, "loja_id inválido.")
+    filtro_loja = " AND g.loja_id = %s" if loja_id else ""
+    params = (ano, mes, ano - 1, mes) + ((loja_id,) if loja_id else ())
     with tenant_session(tid) as cur:
         cur.execute(
             """
             SELECT c.id, c.nome, g.data, sum(g.faturamento_liq), sum(g.cupons), sum(g.itens)
               FROM gold_venda_diaria g JOIN categoria c ON c.id = g.categoria_id
              WHERE date_trunc('month', g.data) IN (make_date(%s,%s,1), make_date(%s,%s,1))
+             """ + filtro_loja + """
              GROUP BY c.id, c.nome, g.data ORDER BY c.nome, g.data
             """,
-            (ano, mes, ano - 1, mes))
+            params)
         por_cat: dict = {}
         for cid, nome, d, fat, cup, itn in cur.fetchall():
             key = str(cid)
@@ -1524,6 +1535,7 @@ def alertas(tid: str = Depends(tenant_of)):
             for lj in _lojas_mes(cur, ult.year, ult.month):
                 if lj["var_ajustada"] is not None and lj["var_ajustada"] <= -0.03:
                     itens.append({"sev": "r", "kpi": "venda_loja",
+                                  "loja_id": lj["id"], "loja": lj["nome"],
                                   "titulo": f"Queda real de venda — {lj['nome']}",
                                   "detalhe": f"{lj['nome']}: venda comparável {lj['var_ajustada']*100:+.1f}% vs. ano anterior."})
         # KRs no vermelho
