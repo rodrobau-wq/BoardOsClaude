@@ -122,6 +122,17 @@
   .aviso{display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:11px;background:var(--warn-soft);
     border:1px solid color-mix(in srgb,var(--warn) 25%,transparent);font-size:12.5px}
   .aviso .ic{color:var(--warn)}
+  /* modal de perfil */
+  .modal-bg{position:fixed;inset:0;z-index:60;background:rgba(8,12,22,.55);display:grid;place-items:center;padding:20px}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow),0 24px 60px rgba(8,12,22,.35);
+    width:100%;max-width:440px;max-height:90vh;overflow:auto}
+  .modal header{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;border-bottom:1px solid var(--border)}
+  .modal .mbody{padding:16px 17px;display:flex;flex-direction:column;gap:12px}
+  .modal label{display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .modal input{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:9px;padding:9px 12px;font:13.5px var(--font)}
+  .modal input:disabled{opacity:.6;cursor:not-allowed}
+  .side .foot{cursor:pointer;border-radius:9px;padding:12px 8px 6px;margin:0 -8px}
+  .side .foot:hover{background:var(--surface-2)}
   /* advisor */
   .fca{display:flex;flex-direction:column;gap:6px;font-size:13px}
   .fca .t{display:flex;gap:10px}.fca .kk{flex:none;width:54px;color:var(--faint);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.3px;padding-top:2px}
@@ -863,6 +874,34 @@
         <span class="tr">Margem</span><span class="tr">Ruptura</span><span class="tr">Status</span>
       </div>
       <div id="indCatsRows"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg hide" id="perfilBg">
+  <div class="modal" role="dialog" aria-label="Perfil do usuário">
+    <header><h2 style="margin:0;font-size:14.5px">Meu perfil</h2>
+      <button class="linklike" id="perfilFechar" style="color:var(--muted)">✕ fechar</button></header>
+    <div class="mbody">
+      <label>E-mail (login)<input id="pfEmail" disabled></label>
+      <label>Nome<input id="pfNome" placeholder="Seu nome"></label>
+      <label>Telefone<input id="pfTelefone" placeholder="(19) 99999-9999"></label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <button class="btn" id="pfSalvar" style="padding:8px 16px;font-size:13px">Salvar</button>
+        <span class="hint" id="pfHint"></span>
+      </div>
+      <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:12px">
+        <b style="font-size:13px;display:block;margin-bottom:10px">Trocar senha</b>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <label>Senha atual<input id="pfSenhaAtual" type="password" autocomplete="current-password"></label>
+          <label>Nova senha (mín. 8)<input id="pfSenhaNova" type="password" autocomplete="new-password"></label>
+          <label>Repita a nova senha<input id="pfSenhaNova2" type="password" autocomplete="new-password"></label>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="btn ghost" id="pfTrocarSenha" style="padding:8px 16px;font-size:13px">Trocar senha</button>
+            <span class="hint" id="pfSenhaHint"></span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -3292,6 +3331,44 @@ el("redeLojaAdd").addEventListener("click", function(){ editorLoja(null, el("red
 window.addEventListener("message", function(e){
   if(e.data && e.data.boardosMapaPronto){ MAPA_PRONTO = true; mandarLojasAoMapa(); }
   if(e.data && e.data.boardosLoja){ REDE_SEL = e.data.boardosLoja; renderRede(); }
+});
+
+// ===================== perfil do usuário =====================
+async function abrirPerfil(){
+  el("perfilBg").classList.remove("hide");
+  el("pfHint").textContent = ""; el("pfSenhaHint").textContent = "";
+  el("pfSenhaAtual").value = el("pfSenhaNova").value = el("pfSenhaNova2").value = "";
+  el("pfEmail").value = "…"; el("pfNome").value = ""; el("pfTelefone").value = "";
+  try{
+    var p = await jget("/perfil");
+    el("pfEmail").value = p.email;
+    el("pfNome").value = p.nome || "";
+    el("pfTelefone").value = p.telefone || "";
+  }catch(e){ el("pfHint").textContent = "Não foi possível carregar: "+e.message; }
+}
+document.querySelector("#sidebar .foot").addEventListener("click", abrirPerfil);
+el("perfilFechar").addEventListener("click", function(){ el("perfilBg").classList.add("hide"); });
+el("perfilBg").addEventListener("click", function(e){ if(e.target === el("perfilBg")) el("perfilBg").classList.add("hide"); });
+el("pfSalvar").addEventListener("click", async function(){
+  el("pfSalvar").disabled = true; el("pfHint").textContent = "Salvando…";
+  try{
+    await jsend("PUT","/perfil",{nome:el("pfNome").value.trim()||null, telefone:el("pfTelefone").value.trim()||null});
+    setUsuario(el("pfNome").value.trim() || el("pfEmail").value, PAPEL);
+    el("pfHint").textContent = "Salvo ✓";
+  }catch(e){ el("pfHint").textContent = e.message; }
+  el("pfSalvar").disabled = false;
+});
+el("pfTrocarSenha").addEventListener("click", async function(){
+  var a = el("pfSenhaAtual").value, n = el("pfSenhaNova").value, n2 = el("pfSenhaNova2").value;
+  if(n.length < 8){ el("pfSenhaHint").textContent = "A nova senha precisa de pelo menos 8 caracteres."; return; }
+  if(n !== n2){ el("pfSenhaHint").textContent = "A confirmação não bate com a nova senha."; return; }
+  el("pfTrocarSenha").disabled = true; el("pfSenhaHint").textContent = "Trocando…";
+  try{
+    await jsend("POST","/auth/trocar-senha",{senha_atual:a, senha_nova:n});
+    el("pfSenhaHint").textContent = "Senha trocada ✓";
+    el("pfSenhaAtual").value = el("pfSenhaNova").value = el("pfSenhaNova2").value = "";
+  }catch(e){ el("pfSenhaHint").textContent = e.message; }
+  el("pfTrocarSenha").disabled = false;
 });
 
 boot();

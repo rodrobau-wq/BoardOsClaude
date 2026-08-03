@@ -2185,3 +2185,43 @@ def jornadas_resumo(jkey: str, user: dict = Depends(current), tid: str = Depends
         cur.execute("UPDATE jornada SET resumo=%s, atualizado_em=now() "
                     "WHERE tenant_id=%s AND jornada=%s", (texto, tid, jkey))
     return {"resumo": texto, "fonte": fonte}
+
+
+# ═══════════════════════════ perfil do usuário ═══════════════════════════
+class PerfilIn(BaseModel):
+    nome: Optional[str] = None
+    telefone: Optional[str] = None
+
+
+@app.get("/perfil")
+def perfil_get(user: dict = Depends(current)):
+    """Dados do próprio usuário logado (qualquer papel, inclusive super_admin)."""
+    with platform_session() as cur:
+        cur.execute("SELECT email, nome, telefone, papel FROM platform.usuario_login "
+                    "WHERE lower(email)=lower(%s)", (user["sub"],))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Usuário não encontrado.")
+    return {"email": row[0], "nome": row[1], "telefone": row[2], "papel": row[3]}
+
+
+@app.put("/perfil")
+def perfil_put(body: PerfilIn, user: dict = Depends(current)):
+    """Atualiza nome e telefone do próprio usuário. O e-mail é a chave de
+    login e não muda por aqui (evita se trancar para fora da conta)."""
+    with platform_session() as cur:
+        cur.execute("UPDATE platform.usuario_login SET nome=%s, telefone=%s "
+                    "WHERE lower(email)=lower(%s)",
+                    ((body.nome or "").strip() or None,
+                     (body.telefone or "").strip() or None, user["sub"]))
+        if cur.rowcount == 0:
+            raise HTTPException(404, "Usuário não encontrado.")
+    # espelha o nome no cadastro do tenant, quando existir
+    if user.get("tenant_id"):
+        try:
+            with tenant_session(user["tenant_id"]) as cur:
+                cur.execute("UPDATE app_user SET nome=%s WHERE lower(email)=lower(%s)",
+                            ((body.nome or "").strip() or None, user["sub"]))
+        except Exception:
+            pass
+    return {"ok": True}
