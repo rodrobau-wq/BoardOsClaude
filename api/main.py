@@ -780,6 +780,8 @@ class LojaIn(BaseModel):
     codigo: str
     nome: str
     formato: Optional[str] = None
+    cep: Optional[str] = None
+    numero: Optional[str] = None
     endereco: Optional[str] = None
     municipio: Optional[str] = None
     uf: Optional[str] = None
@@ -789,7 +791,7 @@ class LojaIn(BaseModel):
 
 
 LOJA_COLS = ("id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2, "
-             "ibge_id, populacao, populacao_ano, pib_per_capita, pib_ano, lat, lng")
+             "ibge_id, populacao, populacao_ano, pib_per_capita, pib_ano, lat, lng, cep, numero")
 
 
 def _loja_row(r):
@@ -800,7 +802,8 @@ def _loja_row(r):
             "pib_per_capita": float(r[11]) if r[11] is not None else None,
             "pib_ano": r[12],
             "lat": float(r[13]) if r[13] is not None else None,
-            "lng": float(r[14]) if r[14] is not None else None}
+            "lng": float(r[14]) if r[14] is not None else None,
+            "cep": r[15], "numero": r[16]}
 
 
 def _ibge_atualiza(cur, loja_id: str, municipio: str, uf: str) -> None:
@@ -836,11 +839,11 @@ def lojas_post(body: LojaIn, user: dict = Depends(current), tid: str = Depends(t
         if cur.fetchone():
             raise HTTPException(409, "Já existe uma loja com esse código.")
         cur.execute(
-            "INSERT INTO loja (tenant_id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2, lat, lng) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "INSERT INTO loja (tenant_id, codigo, nome, formato, endereco, municipio, uf, area_vendas_m2, lat, lng, cep, numero) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (tid, body.codigo.strip(), body.nome.strip(), body.formato,
              body.endereco, body.municipio, (body.uf or "").upper()[:2] or None,
-             body.area_vendas_m2, body.lat, body.lng))
+             body.area_vendas_m2, body.lat, body.lng, body.cep, body.numero))
         lid = str(cur.fetchone()[0])
         if body.municipio and body.uf:
             _ibge_atualiza(cur, lid, body.municipio, body.uf)
@@ -855,10 +858,10 @@ def lojas_put(lid: str, body: LojaIn, user: dict = Depends(current), tid: str = 
     with tenant_session(tid) as cur:
         cur.execute(
             "UPDATE loja SET codigo=%s, nome=%s, formato=%s, endereco=%s, "
-            "municipio=%s, uf=%s, area_vendas_m2=%s, lat=%s, lng=%s WHERE id=%s",
+            "municipio=%s, uf=%s, area_vendas_m2=%s, lat=%s, lng=%s, cep=%s, numero=%s WHERE id=%s",
             (body.codigo.strip(), body.nome.strip(), body.formato, body.endereco,
              body.municipio, (body.uf or "").upper()[:2] or None,
-             body.area_vendas_m2, body.lat, body.lng, lid))
+             body.area_vendas_m2, body.lat, body.lng, body.cep, body.numero, lid))
         if cur.rowcount == 0:
             raise HTTPException(404, "Loja não encontrada.")
         if body.municipio and body.uf:

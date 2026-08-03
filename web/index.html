@@ -1155,6 +1155,8 @@ function openEditor(anchor, fields, onSave, saveLabel){
   box.appendChild(save); box.appendChild(cancel); box.appendChild(err);
   anchor.insertAdjacentElement("afterend", box);
   var first = box.querySelector("input"); if(first) first.focus();
+  inputs.__err = err;              // permite feedback de buscas assíncronas (ex.: CEP)
+  return inputs;
 }
 
 function novoObjetivo(){
@@ -1546,22 +1548,61 @@ async function refreshLojas(){
     }).join("") || '<tr><td colspan="7" class="hint">Nenhuma loja cadastrada. Clique em ＋ Loja.</td></tr>';
   }catch(_){}
 }
+/* CEP → endereço + coordenadas via APIs públicas:
+   BrasilAPI v2 (endereço + coordenada do CEP) → ViaCEP (fallback de endereço)
+   → Nominatim/OpenStreetMap (refina a coordenada com o número). */
+async function buscaCep(cep){
+  cep = (cep||"").replace(/\D/g,"");
+  if(cep.length !== 8) return null;
+  try{
+    var r = await fetch("https://brasilapi.com.br/api/cep/v2/"+cep);
+    if(r.ok){
+      var j = await r.json();
+      var co = j.location && j.location.coordinates;
+      return {logradouro:j.street||"", bairro:j.neighborhood||"", municipio:j.city||"",
+        uf:j.state||"", lat:co&&co.latitude?+co.latitude:null, lng:co&&co.longitude?+co.longitude:null};
+    }
+  }catch(_){}
+  try{
+    var r2 = await fetch("https://viacep.com.br/ws/"+cep+"/json/");
+    if(r2.ok){
+      var v = await r2.json();
+      if(!v.erro) return {logradouro:v.logradouro||"", bairro:v.bairro||"",
+        municipio:v.localidade||"", uf:v.uf||"", lat:null, lng:null};
+    }
+  }catch(_){}
+  return null;
+}
+async function geocodifica(logradouro, numero, municipio, uf){
+  if(!logradouro || !municipio) return null;
+  try{
+    var q = new URLSearchParams({street:(numero?numero+" ":"")+logradouro, city:municipio,
+      state:uf||"", country:"Brasil", format:"jsonv2", limit:"1"});
+    var r = await fetch("https://nominatim.openstreetmap.org/search?"+q.toString());
+    if(r.ok){ var j = await r.json(); if(j.length) return {lat:+j[0].lat, lng:+j[0].lon}; }
+  }catch(_){}
+  return null;
+}
 function editorLoja(l, anchor){
-  openEditor(anchor, [
+  var inputs = openEditor(anchor, [
     {k:"codigo", label:"Código", cls:"w-sm", value:l?l.codigo:"", ph:"ex.: C01"},
     {k:"nome", label:"Nome", cls:"w-lg", value:l?l.nome:"", ph:"ex.: Loja Centro"},
+    {k:"cep", label:"CEP", cls:"w-sm", value:l?(l.cep||""):"", ph:"01310-100"},
+    {k:"numero", label:"Número", cls:"w-sm", value:l?(l.numero||""):"", ph:"890"},
+    {k:"endereco", label:"Endereço (auto pelo CEP)", cls:"w-lg", value:l?(l.endereco||""):""},
+    {k:"municipio", label:"Município (auto)", cls:"w-lg", value:l?(l.municipio||""):""},
+    {k:"uf", label:"UF (auto)", cls:"w-sm", value:l?(l.uf||""):""},
     {k:"formato", label:"Formato", type:"select", value:l?(l.formato||""):"",
       options:[["",""],["vizinhanca","Vizinhança"],["atacarejo","Atacarejo"],["premium","Premium"],["hiper","Hiper"]]},
-    {k:"endereco", label:"Endereço", cls:"w-lg", value:l?(l.endereco||""):""},
-    {k:"municipio", label:"Município", cls:"w-lg", value:l?(l.municipio||""):"", ph:"ex.: Campinas"},
-    {k:"uf", label:"UF", cls:"w-sm", value:l?(l.uf||""):"", ph:"SP"},
     {k:"area", label:"Área m²", cls:"w-sm", type:"number", value:l&&l.area_vendas_m2!=null?l.area_vendas_m2:""},
-    {k:"lat", label:"Latitude", cls:"w-sm", type:"number", value:l&&l.lat!=null?l.lat:"", ph:"-23.54"},
-    {k:"lng", label:"Longitude", cls:"w-sm", type:"number", value:l&&l.lng!=null?l.lng:"", ph:"-46.64"},
+    {k:"lat", label:"Latitude (auto)", cls:"w-sm", type:"number", value:l&&l.lat!=null?l.lat:""},
+    {k:"lng", label:"Longitude (auto)", cls:"w-sm", type:"number", value:l&&l.lng!=null?l.lng:""},
   ], async function(i){
     if(!i.codigo.value.trim() || !i.nome.value.trim()) throw new Error("Código e nome são obrigatórios.");
     var body = {codigo:i.codigo.value.trim(), nome:i.nome.value.trim(),
-      formato:i.formato.value||null, endereco:i.endereco.value.trim()||null,
+      formato:i.formato.value||null,
+      cep:i.cep.value.trim()||null, numero:i.numero.value.trim()||null,
+      endereco:i.endereco.value.trim()||null,
       municipio:i.municipio.value.trim()||null, uf:i.uf.value.trim()||null,
       area_vendas_m2:i.area.value!==""?+i.area.value:null,
       lat:i.lat.value!==""?+i.lat.value:null, lng:i.lng.value!==""?+i.lng.value:null};
@@ -1570,6 +1611,41 @@ function editorLoja(l, anchor){
     await refreshLojas();
     if(TAB==="config") renderRede();
   }, l?"Salvar":"Cadastrar");
+
+  // CEP primeiro: preenche endereço/município/UF e coordenadas sozinho
+  var ultimoCep = null;
+  async function preencher(){
+    var cep = inputs.cep.value.replace(/\D/g,"");
+    if(cep.length !== 8) return;
+    var num = inputs.numero.value.trim();
+    var chave = cep+"|"+num;
+    if(chave === ultimoCep) return;
+    ultimoCep = chave;
+    inputs.__err.style.color = "var(--muted)";
+    inputs.__err.textContent = "Buscando o CEP…";
+    var d = await buscaCep(cep);
+    if(!d){ inputs.__err.textContent = "CEP não encontrado — preencha o endereço manualmente."; return; }
+    inputs.endereco.value = d.logradouro + (num ? ", "+num : "") + (d.bairro ? " · "+d.bairro : "");
+    inputs.municipio.value = d.municipio;
+    inputs.uf.value = d.uf;
+    if(d.lat!=null){ inputs.lat.value = d.lat; inputs.lng.value = d.lng; }
+    inputs.__err.textContent = "Endereço preenchido"
+      + (d.lat!=null ? " · coordenada do CEP aplicada" : "") + (num ? " · refinando com o número…" : "");
+    if(num || d.lat==null){
+      var g = await geocodifica(d.logradouro, num, d.municipio, d.uf);
+      if(g){ inputs.lat.value = g.lat; inputs.lng.value = g.lng;
+        inputs.__err.textContent = "Endereço e coordenadas preenchidos (OpenStreetMap"+(num?", no número":"")+").";
+      } else if(d.lat==null){
+        inputs.__err.textContent = "Endereço preenchido — coordenadas não encontradas, informe manualmente se quiser o mapa.";
+      } else {
+        inputs.__err.textContent = "Endereço preenchido · coordenada aproximada do CEP.";
+      }
+    }
+  }
+  ["change","blur"].forEach(function(ev){
+    inputs.cep.addEventListener(ev, preencher);
+    inputs.numero.addEventListener(ev, preencher);
+  });
 }
 
 async function refreshFeriados(){
