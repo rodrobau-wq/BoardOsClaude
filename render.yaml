@@ -42,9 +42,10 @@ services:
   # Painel visual (static site, free) — consome a API acima.
   - type: web
     name: boardos-painel
+    # gera o carimbo de versão do painel a cada deploy (commit + hora UTC)
     runtime: static
     branch: main
-    buildCommand: echo "sem build (HTML estático)"
+    buildCommand: printf 'window.BOARDOS_BUILD={commit:"%.7s",em:"%s"};' "$RENDER_GIT_COMMIT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > web/versao.js
     staticPublishPath: ./web
     routes:
       - type: rewrite

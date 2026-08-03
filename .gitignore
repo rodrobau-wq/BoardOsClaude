@@ -8,3 +8,4 @@ venv/
 .claude/settings.local.json
 data/gold_diario_exemplo.csv
 scripts/agente_crm.ini
+data/ibge/

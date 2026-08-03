@@ -315,6 +315,7 @@
     <div class="avatar" id="userAvatar">–</div>
     <div><div style="color:var(--ink-2);font-weight:600" id="userNome">—</div><span id="userPapel"></span></div>
   </div>
+  <div id="buildInfo" style="padding:6px 8px 0;font-size:10px;color:var(--faint);line-height:1.5"></div>
 </aside>
 <main class="maincol">
 <div class="topbar">
@@ -344,6 +345,7 @@
     <button class="btn" id="entrar">Entrar</button>
     <div class="err" id="loginErr"></div>
     <div class="hint">Acesso restrito — fale com o administrador da sua rede.</div>
+    <div id="buildInfoLogin" style="margin-top:10px;font-size:10px;color:var(--faint)"></div>
   </div>
 
   <div id="status" class="msg info hide">Clique <b>Carregar</b>.</div>
@@ -906,6 +908,7 @@
   </div>
 </div>
 
+<script src="versao.js"></script>
 <script>
 "use strict";
 var API = location.hostname === "localhost" || location.protocol === "file:"
@@ -3394,6 +3397,29 @@ el("pfTrocarSenha").addEventListener("click", async function(){
   }catch(e){ el("pfSenhaHint").textContent = e.message; }
   el("pfTrocarSenha").disabled = false;
 });
+
+// ===================== versão e hora do deploy =====================
+function fmtDeploy(iso){
+  try{
+    return new Date(iso).toLocaleString("pt-BR", {day:"2-digit", month:"2-digit",
+      hour:"2-digit", minute:"2-digit"});
+  }catch(_){ return iso; }
+}
+(function versaoInfo(){
+  var partes = [];
+  var b = window.BOARDOS_BUILD;
+  partes.push(b && b.commit ? "painel " + b.commit + " · " + fmtDeploy(b.em) : "painel local (dev)");
+  function pinta(){
+    var txt = partes.join("<br>");
+    el("buildInfo").innerHTML = txt;
+    el("buildInfoLogin").innerHTML = partes.join(" · ");
+  }
+  pinta();
+  fetch(API + "/versao").then(function(r){ return r.json(); }).then(function(v){
+    partes.push("API " + v.api + " · deploy " + fmtDeploy(v.deploy_em));
+    pinta();
+  }).catch(function(){});
+})();
 
 boot();
 </script>

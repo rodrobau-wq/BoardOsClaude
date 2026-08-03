@@ -67,9 +67,23 @@ def tenant_of(user: dict = Depends(current),
 
 
 # ----------------------------------------------------------------- saúde
+# versão implantada: commit do deploy (Render injeta RENDER_GIT_COMMIT) e
+# hora do boot do processo (≈ hora do deploy; também muda em restart).
+from datetime import datetime as _dt, timezone as _tz  # noqa: E402
+DEPLOY_EM = _dt.now(_tz.utc)
+VERSAO = (os.environ.get("RENDER_GIT_COMMIT") or "dev")[:7]
+
+
 @app.get("/health")
 def health():
-    return {"ok": True, "service": "boardos", "stage": "auth"}
+    return {"ok": True, "service": "boardos", "stage": "auth",
+            "versao": VERSAO, "deploy_em": DEPLOY_EM.isoformat()}
+
+
+@app.get("/versao")
+def versao():
+    """Versão e hora do deploy da API (público — sem dado sensível)."""
+    return {"api": VERSAO, "deploy_em": DEPLOY_EM.isoformat()}
 
 
 # ----------------------------------------------------------------- login
