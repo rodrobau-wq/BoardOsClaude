@@ -72,7 +72,7 @@ def _coletar(cur) -> Optional[dict]:
            for r in cur.fetchall()]
 
     cur.execute("SELECT id, titulo, status, kr_id, baseline, baseline_em, responsavel, prazo "
-                "FROM fca_ciclo WHERE status IN %s", (FCA_ATIVO,))
+                "FROM fca_ciclo WHERE status = ANY(%s)", (list(FCA_ATIVO),))
     fcas = [{"id": str(r[0]), "titulo": r[1], "status": r[2],
              "kr_id": str(r[3]) if r[3] else None,
              "baseline": float(r[4]) if r[4] is not None else None,

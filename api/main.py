@@ -1647,14 +1647,18 @@ class FcaIn(BaseModel):
 
 
 def _baseline_do_kr(cur, kr_id: str):
-    """Valor vivo do KR no momento em que a ação nasce (mede eficácia depois)."""
+    """Valor vivo do KR no momento em que a ação nasce (mede eficácia depois).
+    Usa a MESMA régua do Verificador (agentes.kr_valor_atual) — se a valoração
+    divergisse, o delta mediria a troca de método, não o efeito da ação."""
     cur.execute("SELECT titulo, meta, atual, base, direcao, fonte FROM okr_kr WHERE id=%s", (kr_id,))
     row = cur.fetchone()
     if not row:
         raise HTTPException(400, "KR não encontrado.")
-    yoy = _yoy_do_ultimo_mes(cur)
-    auto = _kr_auto(row[5], yoy) if row[5] else None
-    return auto if auto is not None else float(row[2])
+    kr = {"titulo": row[0], "meta": float(row[1]), "atual": float(row[2]),
+          "base": float(row[3]) if row[3] is not None else None,
+          "direcao": row[4], "fonte": row[5]}
+    ctx = agentes._coletar(cur) or {}
+    return agentes.kr_valor_atual(kr, ctx)
 
 
 @app.get("/fca")

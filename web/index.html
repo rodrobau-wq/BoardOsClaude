@@ -1903,6 +1903,7 @@ var fcaCache = [];
 async function refreshFca(){
   try{ var r = await jget("/fca"); renderFca(r.ciclos); }
   catch(_){ el("fca").innerHTML = '<span class="hint">Sem planos de ação.</span>'; }
+  if(okrCache.length) renderOkrs(okrCache);   // "Próxima ação" usa FCA→KR
   renderChecklist();
 }
 
@@ -1965,7 +1966,12 @@ function editorFca(c, anchor){
     {k:"status", label:"Status", type:"select", value:c?c.status:"aberto",
       options:[["aberto","Aberto"],["em_andamento","Em andamento"],["resolvido","Resolvido"],["descartado","Descartado"]]},
     {k:"kr_id", label:"KR que esta ação quer mover", type:"select", value:c?(c.kr_id||""):"",
-      options:[["","— nenhum —"]].concat(krOptions())},
+      options:(function(){
+        var ops = krOptions();
+        if(c && c.kr_id && !ops.some(function(o){ return o[0]===c.kr_id; }))
+          ops.unshift([c.kr_id, c.kr || "KR vinculado"]);   // preserva o vínculo mesmo sem okrCache
+        return [["","— nenhum —"]].concat(ops);
+      })()},
     {k:"resultado", label:"Resultado (funcionou?)", cls:"w-lg", value:c?(c.resultado||""):""},
   ], async function(i){
     if(!i.titulo.value.trim()) throw new Error("Dê um título ao plano.");
@@ -1985,7 +1991,7 @@ async function alertaParaFca(i){
   var a = alertCache[i]; if(!a) return;
   try{
     await jsend("POST","/fca",{titulo:a.titulo, fato:a.detalhe, kpi:a.kpi,
-      origem:"alerta", status:"aberto"});
+      kr_id:a.kr_id||null, origem:"alerta", status:"aberto"});
     refreshFca();
     el("fca").scrollIntoView({block:"center"});
   }catch(e){ window.alert("Não foi possível criar o plano: "+e.message); }
@@ -2171,6 +2177,9 @@ function renderEvoBars(){
     if(tjM) metas = use.map(function(m){
       return m.mes.slice(0,4) == tjM.ano ? tjM.metas_mensais[+m.mes.slice(5,7)-1] : null;
     });
+  }
+  if(!vals.some(function(v){ return v!=null; })){
+    box.innerHTML = '<span class="hint">Esta m\u00e9trica precisa de dados que a importa\u00e7\u00e3o atual n\u00e3o tem (ex.: cupons/custo).</span>'; lbl.innerHTML=""; return;
   }
   var max = 0;
   vals.concat(metas).forEach(function(v){ if(v!=null && v>max) max=v; });
@@ -2962,8 +2971,9 @@ function editorRitual(rt, anchor){
 }
 function renderReflexao(){
   if(AG && AG.texto){
-    el("reflexaoMes").innerHTML = '<div style="white-space:pre-wrap">'+AG.texto+'</div>'
+    el("reflexaoMes").innerHTML = '<div style="white-space:pre-wrap"></div>'
       + '<span class="hint" style="font-size:10.5px">rodada dos agentes em '+fmtDeploy(AG.executado_em)+'</span>';
+    el("reflexaoMes").firstChild.textContent = AG.texto;   // sem injeção de HTML
     return;
   }
   var c = last && last.cmp;
@@ -3051,7 +3061,12 @@ function editorDeliberacao(d, anchor){
     {k:"status", label:"Status", type:"select", value:d?d.status:"em_pauta",
       options:[["em_pauta","Em pauta"],["aprovada","Aprovada"],["concluida","Concluída"]]},
     {k:"iniciativa_id", label:"Iniciativa acompanhada", type:"select", value:d?(d.iniciativa_id||""):"",
-      options:[["","— nenhuma —"]].concat(INIS.map(function(x){ return [x.id, x.nome]; }))},
+      options:(function(){
+        var ops = INIS.map(function(x){ return [x.id, x.nome]; });
+        if(d && d.iniciativa_id && !ops.some(function(o){ return o[0]===d.iniciativa_id; }))
+          ops.unshift([d.iniciativa_id, d.iniciativa || "Iniciativa vinculada"]);
+        return [["","— nenhuma —"]].concat(ops);
+      })()},
     {k:"follow", label:"Follow-up", cls:"w-lg", value:d?(d.follow||""):"", ph:"quem · até quando"}
   ], async function(i){
     if(!i.texto.value.trim()) throw new Error("Descreva a deliberação.");
