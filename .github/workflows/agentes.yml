@@ -1,0 +1,29 @@
+name: Squad de agentes BoardOS
+
+# Roda o ciclo diário dos agentes (Analista → Verificador → Projetista → Relator).
+# Segredos necessários (Settings → Secrets and variables → Actions):
+#   BOARDOS_AGENTE_EMAIL / BOARDOS_AGENTE_SENHA — usuário dedicado (papel Admin
+#   ou Estratégico) criado em Minha Rede → Usuários. Não use conta pessoal.
+
+on:
+  schedule:
+    - cron: "0 10 * * *"     # 10:00 UTC = 07:00 BRT, diário
+  workflow_dispatch: {}       # disparo manual para testar
+
+jobs:
+  rodar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login e rodada dos agentes
+        env:
+          API: https://boardos-api.onrender.com
+          EMAIL: ${{ secrets.BOARDOS_AGENTE_EMAIL }}
+          SENHA: ${{ secrets.BOARDOS_AGENTE_SENHA }}
+        run: |
+          set -e
+          if [ -z "$EMAIL" ]; then echo "Configure os secrets BOARDOS_AGENTE_EMAIL/SENHA"; exit 1; fi
+          # acorda a API (plano free hiberna)
+          curl -s -m 90 "$API/health" > /dev/null || true
+          TOKEN=$(curl -s -m 120 "$API/auth/login" -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"senha\":\"$SENHA\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+          curl -s -m 300 -X POST "$API/agentes/rodar" -H "Authorization: Bearer $TOKEN" | python3 -m json.tool

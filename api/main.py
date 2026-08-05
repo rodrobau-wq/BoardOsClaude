@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from boardos import advisor, comparison, descoberta as desc, forecast as fc  # noqa: E402
+from boardos import advisor, agentes, comparison, descoberta as desc, forecast as fc  # noqa: E402
 from boardos.auth import decode_token, hash_password, make_token, verify_password  # noqa: E402
 from boardos.db import platform_session, tenant_session  # noqa: E402
 
@@ -1617,16 +1617,16 @@ def alertas(tid: str = Depends(tenant_of)):
                                   "titulo": f"Queda real de venda — {lj['nome']}",
                                   "detalhe": f"{lj['nome']}: venda comparável {lj['var_ajustada']*100:+.1f}% vs. ano anterior."})
         # KRs no vermelho
-        cur.execute("SELECT k.titulo, k.meta, k.atual, k.base, k.direcao, k.fonte, o.titulo "
+        cur.execute("SELECT k.id, k.titulo, k.meta, k.atual, k.base, k.direcao, k.fonte, o.titulo "
                     "FROM okr_kr k JOIN okr_objetivo o ON o.id=k.objetivo_id")
-        for kt, meta, atual, base, direcao, fonte, ot in cur.fetchall():
+        for kid, kt, meta, atual, base, direcao, fonte, ot in cur.fetchall():
             a = float(atual)
             auto = _kr_auto(fonte, yoy) if fonte else None
             if auto is not None:
                 a = auto
             prog, farol = _kr_progresso(meta, a, base, direcao)
             if farol == "r":
-                itens.append({"sev": "r", "kpi": "okr",
+                itens.append({"sev": "r", "kpi": "okr", "kr_id": str(kid),
                               "titulo": f"Meta fora da rota — {kt}",
                               "detalhe": f"KR \"{kt}\" ({ot}): atual {a:g} vs. meta {float(meta):g} — progresso {prog*100:.0f}%."})
     return {"alertas": itens}
@@ -1643,20 +1643,43 @@ class FcaIn(BaseModel):
     kpi: Optional[str] = None
     origem: str = "manual"
     resultado: Optional[str] = None
+    kr_id: Optional[str] = None          # indicador que esta ação quer mover
+
+
+def _baseline_do_kr(cur, kr_id: str):
+    """Valor vivo do KR no momento em que a ação nasce (mede eficácia depois)."""
+    cur.execute("SELECT titulo, meta, atual, base, direcao, fonte FROM okr_kr WHERE id=%s", (kr_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(400, "KR não encontrado.")
+    yoy = _yoy_do_ultimo_mes(cur)
+    auto = _kr_auto(row[5], yoy) if row[5] else None
+    return auto if auto is not None else float(row[2])
 
 
 @app.get("/fca")
 def fca_list(tid: str = Depends(tenant_of)):
     with tenant_session(tid) as cur:
         cur.execute(
-            "SELECT id, titulo, fato, causa, acao, responsavel, prazo, status, kpi, origem, resultado "
-            "FROM fca_ciclo ORDER BY (status IN ('resolvido','descartado')), criado_em DESC")
+            "SELECT f.id, f.titulo, f.fato, f.causa, f.acao, f.responsavel, f.prazo, f.status, "
+            "f.kpi, f.origem, f.resultado, f.kr_id, k.titulo, f.baseline, f.baseline_em, "
+            "v.veredito, v.delta, v.verificado_em "
+            "FROM fca_ciclo f LEFT JOIN okr_kr k ON k.id=f.kr_id "
+            "LEFT JOIN LATERAL (SELECT veredito, delta, verificado_em FROM acao_verificacao "
+            "  WHERE fca_id=f.id ORDER BY verificado_em DESC LIMIT 1) v ON true "
+            "ORDER BY (f.status IN ('resolvido','descartado')), f.criado_em DESC")
         cols = ["id", "titulo", "fato", "causa", "acao", "responsavel", "prazo",
-                "status", "kpi", "origem", "resultado"]
+                "status", "kpi", "origem", "resultado", "kr_id", "kr", "baseline",
+                "baseline_em", "veredito", "veredito_delta", "verificado_em"]
         rows = [dict(zip(cols, r)) for r in cur.fetchall()]
         for r in rows:
             r["id"] = str(r["id"])
+            r["kr_id"] = str(r["kr_id"]) if r["kr_id"] else None
             r["prazo"] = str(r["prazo"]) if r["prazo"] else None
+            r["baseline"] = float(r["baseline"]) if r["baseline"] is not None else None
+            r["baseline_em"] = str(r["baseline_em"]) if r["baseline_em"] else None
+            r["veredito_delta"] = float(r["veredito_delta"]) if r["veredito_delta"] is not None else None
+            r["verificado_em"] = r["verificado_em"].isoformat() if r["verificado_em"] else None
     return {"ciclos": rows}
 
 
@@ -1664,11 +1687,15 @@ def fca_list(tid: str = Depends(tenant_of)):
 def fca_create(body: FcaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
     _can_edit(user)
     with tenant_session(tid) as cur:
+        baseline = _baseline_do_kr(cur, body.kr_id) if body.kr_id else None
         cur.execute(
-            "INSERT INTO fca_ciclo (tenant_id, titulo, fato, causa, acao, responsavel, prazo, status, kpi, origem, resultado) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            "INSERT INTO fca_ciclo (tenant_id, titulo, fato, causa, acao, responsavel, prazo, "
+            "status, kpi, origem, resultado, kr_id, baseline, baseline_em) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, CASE WHEN %s::uuid IS NULL THEN NULL ELSE CURRENT_DATE END) "
+            "RETURNING id",
             (tid, body.titulo, body.fato, body.causa, body.acao, body.responsavel,
-             body.prazo or None, body.status, body.kpi, body.origem, body.resultado))
+             body.prazo or None, body.status, body.kpi, body.origem, body.resultado,
+             body.kr_id or None, baseline, body.kr_id or None))
         fid = cur.fetchone()[0]
     return {"id": str(fid)}
 
@@ -1677,13 +1704,27 @@ def fca_create(body: FcaIn, user: dict = Depends(current), tid: str = Depends(te
 def fca_update(fid: str, body: FcaIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
     _can_edit(user)
     with tenant_session(tid) as cur:
+        # ligar um KR depois de criado também grava o baseline daquele momento
+        cur.execute("SELECT kr_id FROM fca_ciclo WHERE id=%s", (fid,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(404, "Ciclo não encontrado.")
+        kr_antigo = str(row[0]) if row[0] else None
+        baseline_sql = ""
+        params = [body.titulo, body.fato, body.causa, body.acao, body.responsavel,
+                  body.prazo or None, body.status, body.kpi, body.resultado,
+                  body.kr_id or None]
+        if body.kr_id and body.kr_id != kr_antigo:
+            baseline = _baseline_do_kr(cur, body.kr_id)
+            baseline_sql = ", baseline=%s, baseline_em=CURRENT_DATE"
+            params.append(baseline)
+        elif not body.kr_id and kr_antigo:
+            baseline_sql = ", baseline=NULL, baseline_em=NULL"
+        params.append(fid)
         cur.execute(
             "UPDATE fca_ciclo SET titulo=%s, fato=%s, causa=%s, acao=%s, responsavel=%s, "
-            "prazo=%s, status=%s, kpi=%s, resultado=%s, atualizado_em=now() WHERE id=%s",
-            (body.titulo, body.fato, body.causa, body.acao, body.responsavel,
-             body.prazo or None, body.status, body.kpi, body.resultado, fid))
-        if cur.rowcount == 0:
-            raise HTTPException(404, "Ciclo não encontrado.")
+            "prazo=%s, status=%s, kpi=%s, resultado=%s, kr_id=%s" + baseline_sql +
+            ", atualizado_em=now() WHERE id=%s", params)
     return {"ok": True}
 
 
@@ -1973,15 +2014,19 @@ class DeliberacaoIn(BaseModel):
     data: Optional[str] = None
     status: str = "em_pauta"             # em_pauta | aprovada | concluida
     follow: Optional[str] = None
+    iniciativa_id: Optional[str] = None  # follow-up automático da iniciativa
 
 
 @app.get("/deliberacoes")
 def deliberacoes_get(tid: str = Depends(tenant_of)):
     with tenant_session(tid) as cur:
-        cur.execute("SELECT id, texto, data, status, follow FROM deliberacao "
-                    "ORDER BY (status='concluida'), data DESC NULLS LAST")
+        cur.execute("SELECT d.id, d.texto, d.data, d.status, d.follow, d.iniciativa_id, i.nome "
+                    "FROM deliberacao d LEFT JOIN iniciativa i ON i.id=d.iniciativa_id "
+                    "ORDER BY (d.status='concluida'), d.data DESC NULLS LAST")
         rows = [{"id": str(r[0]), "texto": r[1], "data": str(r[2]) if r[2] else None,
-                 "status": r[3], "follow": r[4]} for r in cur.fetchall()]
+                 "status": r[3], "follow": r[4],
+                 "iniciativa_id": str(r[5]) if r[5] else None, "iniciativa": r[6]}
+                for r in cur.fetchall()]
     return {"deliberacoes": rows}
 
 
@@ -1991,9 +2036,10 @@ def deliberacoes_post(body: DeliberacaoIn, user: dict = Depends(current), tid: s
     if not body.texto.strip():
         raise HTTPException(400, "Descreva a deliberação.")
     with tenant_session(tid) as cur:
-        cur.execute("INSERT INTO deliberacao (tenant_id, texto, data, status, follow) "
-                    "VALUES (%s,%s,%s,%s,%s) RETURNING id",
-                    (tid, body.texto.strip(), body.data or None, body.status, body.follow))
+        cur.execute("INSERT INTO deliberacao (tenant_id, texto, data, status, follow, iniciativa_id) "
+                    "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+                    (tid, body.texto.strip(), body.data or None, body.status, body.follow,
+                     body.iniciativa_id or None))
         did = cur.fetchone()[0]
     return {"id": str(did)}
 
@@ -2002,8 +2048,9 @@ def deliberacoes_post(body: DeliberacaoIn, user: dict = Depends(current), tid: s
 def deliberacoes_put(did: str, body: DeliberacaoIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
     _can_edit(user)
     with tenant_session(tid) as cur:
-        cur.execute("UPDATE deliberacao SET texto=%s, data=%s, status=%s, follow=%s WHERE id=%s",
-                    (body.texto.strip(), body.data or None, body.status, body.follow, did))
+        cur.execute("UPDATE deliberacao SET texto=%s, data=%s, status=%s, follow=%s, iniciativa_id=%s WHERE id=%s",
+                    (body.texto.strip(), body.data or None, body.status, body.follow,
+                     body.iniciativa_id or None, did))
         if cur.rowcount == 0:
             raise HTTPException(404, "Deliberação não encontrada.")
     return {"ok": True}
@@ -2286,3 +2333,54 @@ def demografia_get(lid: str, tid: str = Depends(tenant_of)):
                  "fonte": r[6], "calculado_em": r[7].isoformat()} for r in cur.fetchall()]
     rows.sort(key=lambda x: ordem.get(x["anel"], 9))
     return {"aneis": rows}
+
+
+# ═══════════ trajetória de metas + squad de agentes (ciclo fechado) ═══════════
+@app.get("/okrs/trajetoria")
+def okrs_trajetoria(tid: str = Depends(tenant_of)):
+    """Meta mês a mês de cada KR do ciclo: faturamento usa o mês do ano
+    anterior × meta anual; KRs de nível (%/R$) interpolam base (jan) → meta (dez)."""
+    from datetime import date as _date
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT id, titulo, unidade, meta, base, direcao, fonte FROM okr_kr")
+        krs = cur.fetchall()
+        cur.execute("SELECT max(data) FROM gold_venda_diaria")
+        row = cur.fetchone()
+        ult = row[0] if row else None
+        ano = ult.year if ult else _date.today().year
+        por_mes_fat = {}
+        if ult:
+            cur.execute(
+                "SELECT date_trunc('month', data)::date, sum(faturamento_liq) "
+                "FROM gold_venda_diaria WHERE categoria_id IS NULL "
+                "AND extract(year FROM data) = %s GROUP BY 1", (ano - 1,))
+            por_mes_fat = {r[0].month: float(r[1]) for r in cur.fetchall()}
+    out = []
+    for kid, titulo, unidade, meta, base, direcao, fonte in krs:
+        meta = float(meta)
+        base = float(base) if base is not None else None
+        metas = []
+        for m in range(1, 13):
+            if fonte == "fat_yoy_pct":
+                b = por_mes_fat.get(m)
+                metas.append(round(b * (1 + meta / 100), 2) if b else None)
+            elif base is not None:
+                metas.append(round(base + (meta - base) * m / 12.0, 2))
+            else:
+                metas.append(meta)
+        out.append({"kr_id": str(kid), "titulo": titulo, "unidade": unidade,
+                    "meta": meta, "fonte": fonte, "ano": ano, "metas_mensais": metas})
+    return {"krs": out}
+
+
+@app.post("/agentes/rodar")
+def agentes_rodar(force: bool = False, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    """Roda o squad (Analista → Verificador → Projetista → Relator).
+    Idempotente por dia — o cron e o botão do painel podem chamar à vontade."""
+    _can_edit(user)
+    return agentes.rodar(tid, force=force)
+
+
+@app.get("/agentes/ultima")
+def agentes_ultima(tid: str = Depends(tenant_of)):
+    return agentes.ultima(tid)
