@@ -246,6 +246,8 @@
   .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent-soft);
     color:var(--accent-strong);display:grid;place-items:center;font-weight:700;font-size:12px;flex:none}
   .maincol{display:flex;flex-direction:column;min-width:0}
+  /* sem sidebar (deslogado), o main ocupa o grid inteiro — login centralizado */
+  .side.hide+.maincol{grid-column:1/-1}
   .topbar{position:sticky;top:0;z-index:8;background:color-mix(in srgb,var(--ground) 85%,transparent);
     backdrop-filter:blur(8px);border-bottom:1px solid var(--border);display:flex;align-items:center;
     gap:12px;padding:12px 24px;flex-wrap:wrap}
@@ -305,9 +307,212 @@
   .chk.done span{color:var(--muted);text-decoration:line-through}
   .chk .ib{color:var(--accent);font-weight:700}
   .hide{display:none!important}
+  /* ---- Portal do produto (landing pública) — paleta fixa clara do protótipo ---- */
+  #portal{background:#fff;color:#10202E;min-height:100vh}
+  #portal .pt-wrap{max-width:1120px;margin:0 auto;padding-left:24px;padding-right:24px}
+  #portal .pt-head{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid #E6ECF3}
+  #portal .pt-head-in{display:flex;align-items:center;gap:26px;height:62px}
+  #portal .pt-logo{width:30px;height:30px;border-radius:8px;background:#0A1F38;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  #portal .pt-nav{display:flex;gap:20px;font-size:13px;font-weight:600}
+  #portal .pt-nav a,#portal .pt-cli{color:#10202E;text-decoration:none}
+  #portal .pt-nav a:hover,#portal .pt-cli:hover{color:#1E6FD9}
+  #portal .pt-cli{font-size:13px;font-weight:600;white-space:nowrap}
+  #portal .pt-cta{height:36px;padding:0 16px;background:#1E6FD9;color:#fff;border:none;border-radius:6px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  #portal .pt-cta:hover{background:#4A8FE5}
+  #portal .pt-cta-lg{height:44px;padding:0 22px;border-radius:8px;font-size:14.5px}
+  #portal .pt-hero{background:#0A1F38;color:#F4F8FC}
+  #portal .pt-hero-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center;padding-top:72px;padding-bottom:84px}
+  #portal .pt-hero h1{font-size:42px;line-height:1.12;font-weight:700;letter-spacing:-1.2px;margin:18px 0 14px}
+  #portal .pt-sub{margin:0 0 26px;font-size:15.5px;line-height:1.6;color:#C6D4E4;max-width:46ch}
+  #portal .pt-pill-ia{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 11px;border-radius:999px;background:rgba(108,79,216,.32);color:#CBBCF4;font-size:11.5px;font-weight:600}
+  #portal .pt-pill-roxo{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 11px;border-radius:999px;background:#EDE7FB;color:#6C4FD8;font-size:11.5px;font-weight:600}
+  #portal .pt-ghost-lg{display:inline-flex;align-items:center;height:44px;padding:0 22px;border:1px solid rgba(255,255,255,.32);border-radius:8px;font-size:14.5px;font-weight:600;color:#F4F8FC;text-decoration:none;background:transparent;font-family:inherit;cursor:pointer}
+  #portal .pt-ghost-lg:hover{border-color:#fff;color:#fff}
+  #portal .pt-stats{display:flex;gap:26px;margin-top:34px;font-size:12px;color:#9FB4CC;flex-wrap:wrap}
+  #portal .pt-stats b{display:block;font-size:17px;color:#fff;font-variant-numeric:tabular-nums}
+  #portal .pt-mock{background:#fff;color:#10202E;border-radius:14px;padding:18px 18px 16px;box-shadow:0 24px 60px rgba(1,8,18,.5)}
+  #portal .pt-live{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:#157A47}
+  #portal .pt-live i{width:7px;height:7px;border-radius:50%;background:#1E9E5A}
+  #portal .pt-mock-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  #portal .pt-mock-grid>div{border:1px solid #E6ECF3;border-radius:9px;padding:10px 12px}
+  #portal .pt-mock-grid .k{font-size:10px;font-weight:600;color:#8494A4;text-transform:uppercase;letter-spacing:.5px}
+  #portal .pt-mock-grid .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+  #portal .pt-mock-grid .d{font-size:11px;font-weight:600}
+  #portal .pt-balao{position:absolute;right:-10px;bottom:-26px;max-width:300px;background:#fff;color:#10202E;border-radius:11px;padding:12px 14px;box-shadow:0 16px 40px rgba(1,8,18,.45);border-left:3px solid #6C4FD8}
+  #portal .pt-balao b{font-size:11px;color:#6C4FD8}
+  #portal .pt-balao div{font-size:12px;line-height:1.5;margin-top:3px}
+  #portal .pt-redes{display:flex;align-items:center;gap:30px;padding-top:18px;padding-bottom:18px;flex-wrap:wrap}
+  #portal .pt-redes span{font-size:13.5px;font-weight:700;color:#B3BFCC}
+  #portal .pt-redes .pt-eyebrow{font-size:11px;font-weight:600;color:#8494A4;text-transform:uppercase;letter-spacing:.8px}
+  #portal .pt-sec{padding-top:72px;padding-bottom:72px}
+  #portal .pt-sec h2{font-size:28px;font-weight:700;letter-spacing:-.6px;margin:0 0 8px}
+  #portal .pt-lead{margin:0 0 30px;font-size:14.5px;color:#516170;max-width:62ch}
+  #portal .pt-feats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  #portal .pt-feat{border:1px solid #E6ECF3;border-radius:12px;padding:20px;background:#fff}
+  #portal .pt-feat:hover{border-color:#1E6FD9;box-shadow:0 4px 14px rgba(16,32,46,.08)}
+  #portal .pt-feat .ic{width:38px;height:38px;border-radius:9px;background:#EFF5FC;color:#1E6FD9;display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:12px}
+  #portal .pt-feat b{font-size:14.5px}
+  #portal .pt-feat p{margin:5px 0 0;font-size:12.5px;line-height:1.55;color:#516170}
+  #portal .pt-agents{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  #portal .pt-agent{background:#fff;border:1px solid #E6ECF3;border-top:3px solid #6C4FD8;border-radius:11px;padding:16px}
+  #portal .pt-agent b{font-size:13.5px;color:#10202E}
+  #portal .pt-agent p{margin:6px 0 0;font-size:12px;line-height:1.55;color:#516170}
+  #portal .pt-plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
+  #portal .pt-plan{position:relative;display:flex;flex-direction:column;border:1px solid #E6ECF3;border-radius:14px;padding:24px;background:#fff}
+  #portal .pt-plan.dest{border:2px solid #1E6FD9;box-shadow:0 12px 30px rgba(30,111,217,.16)}
+  #portal .pt-plan .tag{position:absolute;top:-11px;left:50%;transform:translateX(-50%);height:22px;padding:0 12px;border-radius:999px;background:#1E6FD9;color:#fff;font-size:10.5px;font-weight:700;display:inline-flex;align-items:center;white-space:nowrap}
+  #portal .pt-plan .alvo{font-size:12px;color:#516170;margin-top:2px}
+  #portal .pt-plan .preco{margin:14px 0 2px}
+  #portal .pt-plan .preco b{font-size:28px;letter-spacing:-.8px;font-variant-numeric:tabular-nums}
+  #portal .pt-plan .preco span{font-size:12px;color:#8494A4}
+  #portal .pt-plan .nota{font-size:11.5px;color:#8494A4;margin-bottom:14px}
+  #portal .pt-plan .itens{display:flex;flex-direction:column;gap:7px;flex:1}
+  #portal .pt-plan .itens>div{display:flex;gap:8px;font-size:12.5px;line-height:1.45}
+  #portal .pt-plan .itens .ok{color:#1E9E5A;font-weight:700}
+  #portal .pt-plan button{margin-top:18px;height:38px;border-radius:7px;font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;border:1px solid #C6D2DF;background:#fff;color:#10202E}
+  #portal .pt-plan.dest button{border:none;background:#1E6FD9;color:#fff}
+  #portal .pt-plan button:hover{opacity:.88}
+  #portal .pt-cred{margin-top:44px;background:#F9F7FE;border:1px solid #E4DBF6;border-radius:16px;padding:28px}
+  #portal .pt-cred h3{font-size:19px;font-weight:700;letter-spacing:-.4px;margin:0}
+  #portal .pt-cred-tag{font-size:12px;color:#6C4FD8;font-weight:600}
+  #portal .pt-cred>p{margin:0 0 20px;font-size:13px;color:#516170;max-width:78ch}
+  #portal .pt-packs{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  #portal .pt-pack{background:#fff;border:1px solid #E6ECF3;border-radius:11px;padding:16px}
+  #portal .pt-pack.dest{border-color:#6C4FD8}
+  #portal .pt-pack .n{font-size:13px}
+  #portal .pt-pack .preco{margin:8px 0 2px}
+  #portal .pt-pack .preco b{font-size:21px;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+  #portal .pt-pack .preco span{font-size:11px;color:#8494A4}
+  #portal .pt-pack .cr{font-size:11.5px;color:#6C4FD8;font-weight:600;margin-bottom:6px}
+  #portal .pt-pack .d{font-size:11.5px;color:#516170;line-height:1.5}
+  #portal .pt-cred-foot{display:flex;gap:22px;margin-top:16px;font-size:11.5px;color:#8494A4;flex-wrap:wrap}
+  #portal .pt-cta-final{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-top:56px;padding-bottom:56px}
+  #portal .pt-cta-final h2{font-size:24px;font-weight:700;letter-spacing:-.5px;margin:0 0 6px}
+  #portal .pt-cta-final p{margin:0;font-size:13.5px;color:#C6D4E4}
+  #portal .pt-foot{display:flex;align-items:center;gap:14px;padding-top:22px;padding-bottom:22px;font-size:11.5px;color:#8494A4;flex-wrap:wrap}
+  @media(max-width:900px){
+    #portal .pt-hero-grid{grid-template-columns:1fr;padding-top:48px;padding-bottom:64px}
+    #portal .pt-hero h1{font-size:32px}
+    #portal .pt-nav{display:none}
+    #portal .pt-feats{grid-template-columns:1fr 1fr}
+    #portal .pt-agents{grid-template-columns:1fr 1fr}
+    #portal .pt-plans{grid-template-columns:1fr}
+    #portal .pt-packs{grid-template-columns:1fr 1fr}
+    #portal .pt-balao{position:static;margin-top:12px;max-width:none}
+  }
+  @media(max-width:560px){
+    #portal .pt-feats{grid-template-columns:1fr}
+    #portal .pt-agents{grid-template-columns:1fr}
+    #portal .pt-packs{grid-template-columns:1fr}
+    #portal .pt-head-in{gap:14px}
+    #portal .pt-cli{display:none}
+    #portal .pt-cta{padding:0 12px}
+  }
 </style>
 </head>
 <body>
+<!-- Portal do produto — landing pública que antecede o login (tela "Portal do produto" do protótipo) -->
+<div id="portal" class="hide">
+  <div class="pt-head">
+    <div class="pt-wrap pt-head-in">
+      <div style="display:flex;align-items:center;gap:9px"><div class="pt-logo">B</div><b style="font-size:16px;letter-spacing:-.2px">BoardOS</b></div>
+      <div class="pt-nav"><a href="#recursos">Recursos</a><a href="#agentes">Agentes de IA</a><a href="#planos">Planos</a></div>
+      <div style="flex:1"></div>
+      <a href="#" class="pt-cli pt-tocred">Já sou cliente</a>
+      <button class="pt-cta pt-tocred">Acessar plataforma →</button>
+    </div>
+  </div>
+
+  <div class="pt-hero">
+    <div class="pt-wrap pt-hero-grid">
+      <div>
+        <span class="pt-pill-ia">✦ IA aplicada à gestão · varejo supermercadista</span>
+        <h1>A sala de comando da sua rede de supermercados</h1>
+        <p class="pt-sub">Planejar, acompanhar a execução e validar o resultado — o ciclo que hoje não fecha. O BoardOS junta seus números, seus rituais e cinco agentes de IA num só cockpit.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <button class="pt-cta pt-cta-lg pt-tocred">Acessar plataforma →</button>
+          <a href="#planos" class="pt-ghost-lg">Conhecer os planos</a>
+        </div>
+        <div class="pt-stats">
+          <span><b>14 redes</b>rodando no interior de SP</span>
+          <span><b>180 lojas</b>conectadas ao ERP</span>
+          <span><b>5 agentes</b>de IA no seu ritual de gestão</span>
+        </div>
+      </div>
+      <div style="position:relative">
+        <div class="pt-mock">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><b style="font-size:13px">Dashboard Executivo · Supermercados Andrade</b><span class="pt-live"><i></i>ao vivo</span></div>
+          <div class="pt-mock-grid">
+            <div><div class="k">Venda hoje</div><div class="v">R$ 148k</div><div class="d" style="color:#157A47">▲ +6,2% vs D-7</div></div>
+            <div><div class="k">Margem bruta</div><div class="v">23,1%</div><div class="d" style="color:#B37B0A">meta 24,0%</div></div>
+            <div><div class="k">Forecast do mês</div><div class="v">96%</div><div class="d" style="color:#516170;font-weight:400">da meta de venda</div></div>
+            <div><div class="k">FCAs abertas</div><div class="v">7</div><div class="d" style="color:#B22F2A">2 sem responsável</div></div>
+          </div>
+        </div>
+        <div class="pt-balao"><b>✦ Conselheiro</b><div>"O Dia do Cliente cobre 40% do gap de margem. Levo a proposta para o War Room de quinta?"</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="border-bottom:1px solid #E6ECF3">
+    <div class="pt-wrap pt-redes">
+      <span class="pt-eyebrow">Redes que rodam no BoardOS</span>
+      <span>Supermercados Andrade</span><span>Rede Bom Preço</span><span>Grupo Santa Fé</span><span>Mercado União</span><span>Comercial Vila Nova</span>
+    </div>
+  </div>
+
+  <div id="recursos" class="pt-wrap pt-sec">
+    <h2>Tudo o que a diretoria precisa, num lugar só</h2>
+    <p class="pt-lead">Do número do dia à decisão registrada em ata — cada módulo fecha uma parte do ciclo de gestão.</p>
+    <div class="pt-feats" id="ptFeats"></div>
+  </div>
+
+  <div id="agentes" style="background:#F6F8FB;border-top:1px solid #E6ECF3;border-bottom:1px solid #E6ECF3">
+    <div class="pt-wrap pt-sec">
+      <span class="pt-pill-roxo">✦ Inteligência artificial</span>
+      <h2 style="margin-top:14px">Cinco agentes trabalhando no seu ritual</h2>
+      <p class="pt-lead">Não é um chat solto: cada agente tem papel definido dentro do método — e tudo o que eles sugerem vira fato, FCA ou pauta com responsável.</p>
+      <div class="pt-agents" id="ptAgents"></div>
+    </div>
+  </div>
+
+  <div id="planos" class="pt-wrap pt-sec">
+    <h2 style="text-align:center">Planos que crescem com a sua rede</h2>
+    <p class="pt-lead" style="text-align:center;margin-left:auto;margin-right:auto;max-width:52ch">Comece pelo essencial e evolua para o cockpit completo. Teste grátis de 14 dias, sem cartão.</p>
+    <div class="pt-plans" id="ptPlans"></div>
+    <div class="pt-cred">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+        <h3>✦ Créditos de IA — cobrados à parte</h3>
+        <span class="pt-cred-tag">1 crédito = 1 ação de agente: análise, ata, alerta investigado ou resposta do Conselheiro</span>
+      </div>
+      <p>Cada plano inclui uma franquia mensal. Passou, os agentes continuam funcionando — você só contrata um pacote adicional, sem surpresa na fatura. Créditos não usados acumulam por 90 dias.</p>
+      <div class="pt-packs" id="ptPacks"></div>
+      <div class="pt-cred-foot">
+        <span id="ptFranquia"></span>
+        <span>✓ Alerta em 80% do consumo</span>
+        <span>✓ Recarga automática opcional</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pt-hero">
+    <div class="pt-wrap pt-cta-final">
+      <div>
+        <h2>Pronto para fechar o ciclo da sua gestão?</h2>
+        <p>Em 30 minutos conectamos seu ERP e você vê a sua rede no cockpit.</p>
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <button class="pt-cta pt-cta-lg pt-tocred">Acessar plataforma →</button>
+        <button class="pt-ghost-lg pt-tocred">Falar com especialista</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pt-wrap pt-foot">
+    <span><b style="color:#10202E">BoardOS</b> · Direção Cockpit Executivo</span><span style="flex:1"></span>
+    <span>LGPD by design</span><span>Integração Consinco · RP · Zanthus</span><span>© 2026</span>
+  </div>
+</div>
 <div class="app">
 <aside class="side hide" id="sidebar">
   <div class="brand">
@@ -375,6 +580,7 @@
 
 <div class="wrap">
   <div id="login" class="login-card">
+    <a href="#" id="voltarSite" style="display:inline-block;font-size:12px;font-weight:600;color:var(--muted);text-decoration:none;margin-bottom:4px">← Voltar ao site</a>
     <h2>Entrar</h2>
     <div class="lead">Painel Estratégico BoardOS</div>
     <input id="email" type="email" placeholder="e-mail" autocomplete="username">
@@ -1052,11 +1258,13 @@ function brl(v){return "R$ "+(v/1000).toLocaleString("pt-BR",{maximumFractionDig
 function el(id){return document.getElementById(id);}
 
 async function jget(path){
-  var h = {"Authorization":"Bearer "+TOKEN};
+  var tk = TOKEN;
+  var h = {"Authorization":"Bearer "+tk};
   var emp = el("empresa");
   if(!emp.classList.contains("hide") && emp.value) h["X-Tenant-Id"] = emp.value;
   var r = await fetch(API+path, {headers:h});
-  if(r.status===401){ logout("Sessão expirada. Entre novamente."); throw new Error("401"); }
+  // 401 de requisição antiga (token já trocado por um login novo) não desloga
+  if(r.status===401){ if(TOKEN===tk) logout("Sessão expirada. Entre novamente."); throw new Error("401"); }
   if(!r.ok){var t=await r.text(); throw new Error("HTTP "+r.status+" — "+t);}
   return r.json();
 }
@@ -1384,11 +1592,12 @@ function updateCicloCard(){
 var DIRECAO = null;
 
 async function jsend(method, path, body){
-  var h = {"Authorization":"Bearer "+TOKEN, "Content-Type":"application/json"};
+  var tk = TOKEN;
+  var h = {"Authorization":"Bearer "+tk, "Content-Type":"application/json"};
   var emp = el("empresa");
   if(!emp.classList.contains("hide") && emp.value) h["X-Tenant-Id"] = emp.value;
   var r = await fetch(API+path, {method:method, headers:h, body: body?JSON.stringify(body):undefined});
-  if(r.status===401){ logout("Sessão expirada. Entre novamente."); throw new Error("401"); }
+  if(r.status===401){ if(TOKEN===tk) logout("Sessão expirada. Entre novamente."); throw new Error("401"); }
   if(!r.ok){ var t = await r.json().catch(function(){return {detail:"HTTP "+r.status};});
     throw new Error(t.detail || ("HTTP "+r.status)); }
   return r.json();
@@ -2889,8 +3098,13 @@ function showLogin(msg){
   });
   el("tenantNome").textContent = "Painel Estratégico";
   el("loginErr").textContent = msg || "";
+  // sem mensagem (visita/saída normal) → landing pública; com mensagem
+  // (sessão expirada etc.) → direto no cartão de login, para o aviso aparecer
+  if(msg) mostrarCred(); else mostrarPortal();
 }
 function showApp(tenantNome){
+  el("portal").classList.add("hide");
+  document.querySelector(".app").classList.remove("hide");
   el("login").classList.add("hide");
   el("cfg").classList.remove("hide");
   el("sidebar").classList.remove("hide");
@@ -2907,6 +3121,85 @@ function setUsuario(nome, papel){
   el("userPapel").textContent = rot[papel] || papel || "";
 }
 function logout(msg){ setToken(null); showLogin(msg); }
+
+/* ---- Portal do produto (landing pública que antecede o login) ----
+   Os textos fixos vieram do protótipo; as 4 listas abaixo estavam no trecho
+   truncado do arquivo de design (cap de 256 KB) e foram reconstruídas —
+   ajuste aqui nomes, preços e itens quando quiser. */
+var PORTAL_DADOS = {
+  feats: [
+    {ic:"◧", t:"Dashboard Executivo", d:"10 segundos para saber onde atuar: semáforo dos KPIs críticos, forecast e o bloco “precisa de você”."},
+    {ic:"▤", t:"Painel de Indicadores", d:"Venda, margem, ruptura, quebra e ticket — com meta, semáforo e carimbo de fonte em todo número."},
+    {ic:"◎", t:"OKRs conectados", d:"Metas desdobradas da empresa à pessoa, com a barra pintada pelo forecast, não pelo realizado."},
+    {ic:"⚑", t:"FCAs & Fatos Relevantes", d:"Todo desvio vira fato → causa → ação com dono e prazo; qualquer evento é registrado em 30 segundos."},
+    {ic:"▣", t:"Reuniões com método", d:"Pauta montada pelo desvio, decisões registradas em ata e taxa de execução acompanhada."},
+    {ic:"◈", t:"Remuneração Variável", d:"Cestas de KPIs com pesos e simulador, aprovadas pelo dono — ligadas ao mesmo número oficial."}
+  ],
+  agents: [
+    {t:"Conselheiro", d:"Conversa com o contexto do seu negócio e traz a sugestão do dia — todo número citado com fonte."},
+    {t:"Analista", d:"Vigia os indicadores, investiga desvios e propõe o rascunho do FCA antes de o problema crescer."},
+    {t:"Secretário", d:"Monta a pauta pelo desvio, registra decisões com dono e prazo e escreve a ata sozinho."},
+    {t:"Curador", d:"Classifica cada fato relevante e propaga o efeito: forecast, FCA, SWOT ou war room."},
+    {t:"Guia", d:"Critica objetivo vago, sugere KR mensurável e acompanha o ritual de cada etapa do ciclo."}
+  ],
+  plans: [
+    {nome:"Essencial", alvo:"para redes de até 6 lojas", preco:"R$ 990", per:"/mês por rede",
+     nota:"franquia de 300 créditos de IA inclusa", cta:"Começar teste grátis",
+     itens:["Dashboard Executivo e PIs oficiais","Importação por planilha oficial","OKRs, FCAs e fatos relevantes","Reuniões com ata automática","5 usuários incluídos"]},
+    {nome:"Rede", alvo:"para redes de 7 a 30 lojas", preco:"R$ 2.490", per:"/mês por rede", dest:true,
+     nota:"franquia de 1.500 créditos de IA inclusa", cta:"Começar teste grátis",
+     itens:["Tudo do Essencial","Radar MERCADO e maturidade de gestão","Remuneração variável com aprovação do dono","War room e taxa de execução de decisões","Usuários ilimitados"]},
+    {nome:"Enterprise", alvo:"para redes 30+ lojas e holdings", preco:"Sob medida", per:"",
+     nota:"créditos de IA sob medida", cta:"Falar com especialista",
+     itens:["Tudo do Rede","Conector ERP (Consinco · RP · Zanthus)","Múltiplas empresas e identidade global","MFA/SSO e permissões avançadas","Consultor de implantação dedicado"]}
+  ],
+  packs: [
+    {nome:"Pacote 500", preco:"R$ 190", per:"por pacote", creditos:"+500 créditos", d:"Para o mês que apertou — vale por 90 dias."},
+    {nome:"Pacote 2.000", preco:"R$ 590", per:"por pacote", creditos:"+2.000 créditos", dest:true, d:"O mais comum em redes médias em calibração."},
+    {nome:"Pacote 5.000", preco:"R$ 1.190", per:"por pacote", creditos:"+5.000 créditos", d:"Ciclos de diagnóstico e war rooms intensos."},
+    {nome:"Pacote 10.000", preco:"R$ 1.990", per:"por pacote", creditos:"+10.000 créditos", d:"Holdings e redes grandes, uso contínuo."}
+  ]
+};
+function renderPortal(){
+  el("ptFeats").innerHTML = PORTAL_DADOS.feats.map(function(f){
+    return '<div class="pt-feat"><div class="ic">'+f.ic+'</div><b>'+f.t+'</b><p>'+f.d+'</p></div>';
+  }).join("");
+  el("ptAgents").innerHTML = PORTAL_DADOS.agents.map(function(a){
+    return '<div class="pt-agent"><b>✦ '+a.t+'</b><p>'+a.d+'</p></div>';
+  }).join("");
+  el("ptPlans").innerHTML = PORTAL_DADOS.plans.map(function(p){
+    return '<div class="pt-plan'+(p.dest?' dest':'')+'">'+(p.dest?'<span class="tag">MAIS ESCOLHIDO</span>':'')+
+      '<b style="font-size:15px">'+p.nome+'</b><div class="alvo">'+p.alvo+'</div>'+
+      '<div class="preco"><b>'+p.preco+'</b><span> '+p.per+'</span></div>'+
+      '<div class="nota">'+p.nota+'</div>'+
+      '<div class="itens">'+p.itens.map(function(it){return '<div><span class="ok">✓</span><span>'+it+'</span></div>';}).join("")+'</div>'+
+      '<button class="pt-tocred">'+p.cta+'</button></div>';
+  }).join("");
+  el("ptPacks").innerHTML = PORTAL_DADOS.packs.map(function(c){
+    return '<div class="pt-pack'+(c.dest?' dest':'')+'"><b class="n">'+c.nome+'</b>'+
+      '<div class="preco"><b>'+c.preco+'</b><span> '+c.per+'</span></div>'+
+      '<div class="cr">'+c.creditos+'</div><div class="d">'+c.d+'</div></div>';
+  }).join("");
+  // rodapé de franquia derivado dos planos — fonte única em PORTAL_DADOS
+  el("ptFranquia").textContent = "✓ Franquia inclusa: " + PORTAL_DADOS.plans.map(function(p){
+    var m = p.nota.match(/\d[\d.,]*/); return p.nome + " " + (m ? m[0] : "sob medida");
+  }).join(" · ");
+  Array.prototype.forEach.call(document.querySelectorAll("#portal .pt-tocred"), function(b){
+    b.addEventListener("click", function(ev){ ev.preventDefault(); mostrarCred(); });
+  });
+}
+function mostrarPortal(){
+  el("portal").classList.remove("hide");
+  document.querySelector(".app").classList.add("hide");
+  el("loginErr").textContent = "";
+  window.scrollTo(0,0);
+}
+function mostrarCred(){
+  el("portal").classList.add("hide");
+  document.querySelector(".app").classList.remove("hide");
+  window.scrollTo(0,0);
+  try{ el("email").focus(); }catch(e){}
+}
 
 async function entrar(){
   var email = el("email").value.trim(), senha = el("senha").value;
@@ -2959,6 +3252,7 @@ async function boot(){
 }
 
 el("entrar").addEventListener("click", entrar);
+el("voltarSite").addEventListener("click", function(ev){ ev.preventDefault(); mostrarPortal(); });
 el("senha").addEventListener("keydown", function(e){ if(e.key==="Enter") entrar(); });
 el("logout").addEventListener("click", function(){ el("empresa").classList.add("hide"); logout(); });
 el("load").addEventListener("click", load);
@@ -4047,6 +4341,7 @@ el("fatoConfirmar").addEventListener("click", async function(){
 });
 el("fatoDescartar").addEventListener("click", function(){ el("fatoBg").classList.add("hide"); });
 
+renderPortal();
 boot();
 </script>
 </main>
