@@ -2488,8 +2488,14 @@ def fatos_post(body: FatoIn, user: dict = Depends(current), tid: str = Depends(t
             "propagacao": prop}
 
 
+class FatoConfirmarIn(BaseModel):
+    fca: Optional[bool] = None           # sobrescreve a propagação proposta
+    swot: Optional[bool] = None
+
+
 @app.post("/fatos/{fid}/confirmar")
-def fatos_confirmar(fid: str, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+def fatos_confirmar(fid: str, body: Optional[FatoConfirmarIn] = None,
+                    user: dict = Depends(current), tid: str = Depends(tenant_of)):
     """Confirma o fato e aplica a propagação: cria FCA e/ou item de SWOT.
     Nada acontece sem esta confirmação humana (contrato do design system)."""
     _can_edit(user)
@@ -2499,6 +2505,11 @@ def fatos_confirmar(fid: str, user: dict = Depends(current), tid: str = Depends(
         if not row:
             raise HTTPException(404, "Fato não encontrado.")
         texto, pilar, prop, confirmado, loja_id = row[0], row[1], row[2] or {}, row[3], row[4]
+        if body is not None:             # o usuário editou a propagação no modal
+            if body.fca is not None:
+                prop["fca"] = body.fca
+            if body.swot is not None:
+                prop["swot"] = body.swot
         if confirmado:
             return {"ok": True, "ja_confirmado": True}
         fca_id = None
