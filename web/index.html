@@ -2202,6 +2202,11 @@ async function refreshFatos(){
       }).join("")
     : '<span class="hint" style="display:block;padding:10px 17px">Nenhum fato registrado ainda — use o ＋ ou o botão do topo.</span>';
 }
+function krOptions(){
+  var out = [];
+  okrCache.forEach(function(o){ (o.krs||[]).forEach(function(k){ out.push([k.id, k.titulo]); }); });
+  return out;
+}
 function editorFca(c, anchor){
   openEditor(anchor, [
     {k:"titulo", label:"Título", cls:"w-lg", value:c?c.titulo:"", ph:"ex.: Ruptura alta no fim de semana"},
@@ -2227,6 +2232,7 @@ function editorFca(c, anchor){
       responsavel:i.responsavel.value.trim()||null, prazo:i.prazo.value||null,
       status:i.status.value, resultado:i.resultado.value.trim()||null,
       kr_id:i.kr_id.value||null,
+      pilar:c?(c.pilar||null):null,
       kpi:c?c.kpi:null, origem:c?c.origem:"manual"};
     if(c) await jsend("PUT","/fca/"+c.id, body);
     else await jsend("POST","/fca", body);
@@ -3384,6 +3390,8 @@ function editorDeliberacao(d, anchor){
     {k:"data", label:"Data", type:"date", value:d?(d.data||""):""},
     {k:"status", label:"Status", type:"select", value:d?d.status:"em_pauta",
       options:[["em_pauta","Em pauta"],["aprovada","Aprovada"],["concluida","Concluída"]]},
+    {k:"dono", label:"Dono da decisão", cls:"w-sm", value:d?(d.dono||""):""},
+    {k:"prazo", label:"Prazo", type:"date", value:d?(d.prazo||""):""},
     {k:"iniciativa_id", label:"Iniciativa acompanhada", type:"select", value:d?(d.iniciativa_id||""):"",
       options:(function(){
         var ops = INIS.map(function(x){ return [x.id, x.nome]; });
@@ -3396,6 +3404,7 @@ function editorDeliberacao(d, anchor){
     if(!i.texto.value.trim()) throw new Error("Descreva a deliberação.");
     var body = {texto:i.texto.value.trim(), data:i.data.value||null, status:i.status.value,
       iniciativa_id:i.iniciativa_id.value||null,
+      dono:i.dono.value.trim()||null, prazo:i.prazo.value||null,
       follow:i.follow.value.trim()||null};
     if(d) await jsend("PUT","/deliberacoes/"+d.id, body);
     else await jsend("POST","/deliberacoes", body);
@@ -3432,7 +3441,8 @@ function editorReuniao(r, anchor){
   ], async function(i){
     var body = {titulo:i.titulo.value.trim()||"Reunião do conselho", data:i.data.value||null,
       hora:i.hora.value.trim()||null, local:i.local.value.trim()||null,
-      status:i.status.value, assinada:!!i.assinada.value, tipo:i.tipo.value};
+      status:i.status.value, assinada:!!i.assinada.value, tipo:i.tipo.value,
+      participantes:r?(r.participantes||null):null};
     if(r) await jsend("PUT","/conselho/reunioes/"+r.id, body);
     else await jsend("POST","/conselho/reunioes", body);
     loadSala();
@@ -3450,7 +3460,8 @@ el("btnPauta").addEventListener("click", function(){
     return {item:p[0]||"", tempo:p[1]||null, material:p[2]||null};
   });
   jsend("PUT","/conselho/reunioes/"+r.id, {titulo:r.titulo, data:r.data, hora:r.hora, local:r.local,
-    status:r.status, assinada:r.assinada, pauta:pauta}).then(loadSala)
+    status:r.status, assinada:r.assinada, tipo:r.tipo||"conselho",
+    participantes:r.participantes||null, pauta:pauta}).then(loadSala)
     .catch(function(e){ window.alert(e.message); });
 });
 el("btnCaderno").addEventListener("click", async function(){
@@ -3939,6 +3950,9 @@ var FATO_TAGS = ["Concorrência","Clima","Fornecedor","Preço","Operação"];
 var fatoSel = {loja:null, tags:[]}, fatoId = null;
 function abrirFato(){
   fatoSel = {loja:null, tags:[]}; fatoId = null;
+  if(!lojasCache.length){
+    jget("/lojas").then(function(r){ lojasCache = r.lojas || []; abrirFato(); }).catch(function(){});
+  }
   el("fatoTexto").value = "";
   el("fatoPasso1").classList.remove("hide");
   el("fatoPasso2").classList.add("hide");

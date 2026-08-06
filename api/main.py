@@ -713,9 +713,19 @@ def swot_delete(sid: str, user: dict = Depends(current), tid: str = Depends(tena
 
 @app.get("/radar")
 def radar_get(tid: str = Depends(tenant_of)):
+    # notas gravadas com os nomes antigos (radar de 5 áreas) são aproveitadas
+    LEGADO = {"Comercial/Vendas": "Comercial & Pricing",
+              "Marketing/Fidelização": "Experiência do Cliente",
+              "Operação/Pessoas": "Operações de Loja",
+              "Inovação": "Digital & Multicanal"}
     with tenant_session(tid) as cur:
-        cur.execute("SELECT area, nota FROM radar_nota")
-        notas = {r[0]: r[1] for r in cur.fetchall()}
+        cur.execute("SELECT area, nota FROM radar_nota WHERE tenant_id=%s", (tid,))
+        cru = {r[0]: int(r[1]) for r in cur.fetchall()}
+    notas = {}
+    for area, nota in cru.items():
+        alvo = area if area in RADAR_AREAS else LEGADO.get(area)
+        if alvo and alvo not in notas:
+            notas[alvo] = nota
     return {"areas": RADAR_AREAS, "notas": notas}
 
 
@@ -2522,8 +2532,9 @@ def fatos_confirmar(fid: str, body: Optional[FatoConfirmarIn] = None,
             cur.execute("INSERT INTO swot_item (tenant_id, quadrante, texto, ordem) "
                         "SELECT %s,'ameaca',%s, COALESCE(max(ordem)+1,0) FROM swot_item WHERE quadrante='ameaca'",
                         (tid, texto[:200] + " (fato)"))
-        cur.execute("UPDATE fato_relevante SET confirmado=true, fca_id=%s WHERE id=%s",
-                    (fca_id, fid))
+        import json as _json
+        cur.execute("UPDATE fato_relevante SET confirmado=true, fca_id=%s, propagacao=%s WHERE id=%s",
+                    (fca_id, _json.dumps(prop), fid))
     return {"ok": True, "fca_id": str(fca_id) if fca_id else None}
 
 
@@ -2719,6 +2730,7 @@ def conversa_post(body: ChatIn, user: dict = Depends(current), tid: str = Depend
         raise HTTPException(400, "Escreva a pergunta.")
     contexto, _ = _contexto_tenant(tid)
     resposta = advisor.responder_pergunta(contexto, body.texto.strip()) if contexto else None
+    persistir_resposta = bool(resposta)      # aviso de IA inativa não vira histórico
     if not resposta:
         resposta = ("A IA do Conselheiro ainda não está ativa (configure a ANTHROPIC_API_KEY "
                     "no servidor) — mas seus números continuam no Painel e nos PIs.")
@@ -2729,10 +2741,13 @@ def conversa_post(body: ChatIn, user: dict = Depends(current), tid: str = Depend
         if chave in low and rot not in fontes:
             fontes.append(rot)
     with tenant_session(tid) as cur:
-        cur.execute("INSERT INTO conversa_msg (tenant_id, autor, papel, texto) VALUES (%s,%s,'user',%s)",
+        cur.execute("INSERT INTO conversa_msg (tenant_id, autor, papel, texto, criado_em) "
+                    "VALUES (%s,%s,'user',%s, clock_timestamp())",
                     (tid, user.get("nome") or user.get("sub"), body.texto.strip()))
-        cur.execute("INSERT INTO conversa_msg (tenant_id, autor, papel, texto, fontes) "
-                    "VALUES (%s,'conselheiro','ia',%s,%s)", (tid, resposta, fontes or None))
+        if persistir_resposta:
+            cur.execute("INSERT INTO conversa_msg (tenant_id, autor, papel, texto, fontes, criado_em) "
+                        "VALUES (%s,'conselheiro','ia',%s,%s, clock_timestamp())",
+                        (tid, resposta, fontes or None))
     return {"resposta": resposta, "fontes": fontes}
 
 
@@ -2779,6 +2794,9 @@ def decisoes_taxa(tid: str = Depends(tenant_of)):
         return {"taxa": None, "total": 0,
                 "nota": "cadastre prazo nas deliberações para medir a execução"}
     hoje = _date.today()
-    no_prazo = sum(1 for st, pz in rows if st == "concluida" or pz >= hoje)
-    return {"taxa": round(no_prazo / len(rows), 3), "total": len(rows),
-            "vencidas": sum(1 for st, pz in rows if st != "concluida" and pz < hoje)}
+    concluidas = sum(1 for st, _ in rows if st == "concluida")
+    vencidas = sum(1 for st, pz in rows if st != "concluida" and pz < hoje)
+    elegiveis = concluidas + vencidas        # pendentes dentro do prazo ficam fora
+    return {"taxa": round(concluidas / elegiveis, 3) if elegiveis else None,
+            "total": len(rows), "vencidas": vencidas,
+            "nota": "taxa = concluídas ÷ (concluídas + vencidas); pendentes no prazo não contam"}
