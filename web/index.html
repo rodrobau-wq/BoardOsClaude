@@ -1069,7 +1069,7 @@ async function load(){
     setStatus("Escolha a <b>empresa</b> no seletor para carregar os dados.", "info"); return;
   }
   var ano = +el("ano").value, mes = +el("mes").value;
-  setStatus("Carregando…", "info");
+  setStatus("Carregando os números…", "info");
   try{
     var mm = String(mes).padStart(2,"0");
     var ult = new Date(ano, mes, 0).getDate();
@@ -1140,14 +1140,46 @@ async function load(){
     el("content").classList.remove("hide");
     setStatus("", "hide");
   }catch(e){
-    setStatus("Não foi possível carregar. "+e.message+
-      (String(e.message).indexOf("404")>=0?" — rode o seed (python scripts/seed_demo_gold.py) no Shell do Render.":""), "err");
+    var semDados = String(e.message).indexOf("Sem dados") >= 0 || String(e.message).indexOf("404") >= 0;
+    if(semDados){
+      var ult = null;
+      try{ var u = await jget("/kpi/ultimo-dia"); ult = u.ultimo_dia || null; }catch(_){}
+      var msg = "<b>Ainda não há vendas em "+periodoLabel()+".</b> ";
+      if(ult){
+        var ua = +ult.slice(0,4), um = +ult.slice(5,7);
+        msg += "Seus dados vão até <b>"+MES_NOME[um-1].toLowerCase()+" de "+ua+"</b>. "
+          + '<button class="linklike" data-stmes="'+ua+'-'+um+'">Ver '+MES_NOME[um-1].toLowerCase()+"/"+ua+' →</button>'
+          + ' <span style="color:var(--faint)">·</span> '
+          + '<button class="linklike" data-stimportar>Importar novos dados →</button>';
+      } else {
+        msg += "Assim que a primeira importação entrar, o painel acende sozinho. "
+          + '<button class="linklike" data-stimportar>Importar dados →</button>';
+      }
+      setStatus(msg, "info");
+    } else {
+      setStatus("<b>Não conseguimos carregar os dados agora.</b> Pode ser a conexão ou o servidor "
+        + "acordando — tente de novo em instantes. "
+        + '<button class="linklike" data-sttentar>Tentar de novo →</button>'
+        + '<span style="display:block;margin-top:4px;color:var(--faint);font-size:11px">detalhe técnico: '
+        + String(e.message).slice(0,120) + "</span>", "info");
+    }
   }
 }
+// ações do aviso de status (pular para o mês com dados / importar / tentar de novo)
+document.addEventListener("click", function(e){
+  var m = e.target.closest("[data-stmes]");
+  if(m){
+    var p = m.getAttribute("data-stmes").split("-");
+    el("ano").value = +p[0]; el("mes").value = +p[1];
+    load(); return;
+  }
+  if(e.target.closest("[data-stimportar]")){ showTab("config"); showCfgTab("dados"); return; }
+  if(e.target.closest("[data-sttentar]")){ load(); }
+});
 
 function setStatus(txt, kind){
   var s = el("status");
-  if(kind==="hide"){s.classList.add("hide");return;}
+  if(kind==="hide"){s.classList.add("hide");s.innerHTML="";return;}
   s.classList.remove("hide"); s.className="msg "+(kind==="err"?"err":"info"); s.innerHTML=txt;
 }
 
@@ -1528,7 +1560,7 @@ function showTab(t){
     });
     el("viewTitle").textContent = VIEW_TITLES[t] || "BoardOS";
     el("ecTitulo").textContent = VIEW_TITLES[t] || "Em construção";
-    ["conselho","plano","evolucao","execucao","salaconselho","indicadores","config","admin","content"]
+    ["conselho","plano","evolucao","execucao","salaconselho","indicadores","config","admin","content","status"]
       .forEach(function(id){ el(id).classList.add("hide"); });
     el("emconstrucao").classList.remove("hide");
     TAB = t;
@@ -1547,6 +1579,8 @@ function showTab(t){
   }
   TAB = t;
   el("viewTitle").textContent = VIEW_TITLES[t] || "BoardOS";
+  if(t !== "hoje") el("status").classList.add("hide");
+  else if(el("status").innerHTML) el("status").classList.remove("hide");
   Array.prototype.forEach.call(document.querySelectorAll("#tabs .tab"), function(b){
     b.classList.toggle("on", b.getAttribute("data-tab") === t);
   });
