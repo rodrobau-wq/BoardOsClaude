@@ -36,10 +36,15 @@ def verify_password(senha: str, stored: str) -> bool:
         return False
 
 
-def make_token(sub: str, nome: str, tenant_id: str, papel: str) -> str:
+def make_token(sub: str, nome: str, tenant_id: str, papel: str,
+               exp_limite: datetime | None = None) -> str:
+    """exp_limite: teto adicional (ex.: fim do trial) — o token nunca
+    sobrevive além dele, mesmo dentro da janela normal de TOKEN_HORAS."""
+    exp = datetime.now(timezone.utc) + timedelta(hours=TOKEN_HORAS)
+    if exp_limite is not None and exp_limite < exp:
+        exp = exp_limite
     payload = {
-        "sub": sub, "nome": nome, "tenant_id": tenant_id, "papel": papel,
-        "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_HORAS),
+        "sub": sub, "nome": nome, "tenant_id": tenant_id, "papel": papel, "exp": exp,
     }
     return jwt.encode(payload, SECRET, algorithm="HS256")
 

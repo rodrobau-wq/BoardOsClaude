@@ -16,12 +16,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from typing import Dict, Optional  # noqa: E402
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile  # noqa: E402
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer  # noqa: E402
-from pydantic import BaseModel  # noqa: E402
+from pydantic import BaseModel, field_validator  # noqa: E402
 
-from boardos import advisor, agentes, comparison, descoberta as desc, forecast as fc  # noqa: E402
+from boardos import advisor, agentes, comparison, descoberta as desc, forecast as fc, onboarding as onb  # noqa: E402
 from boardos.auth import decode_token, hash_password, make_token, verify_password  # noqa: E402
 from boardos.db import platform_session, tenant_session  # noqa: E402
 
@@ -129,15 +129,32 @@ def login(body: LoginIn):
     tenant = None
     if tenant_id:
         with platform_session() as cur:
-            cur.execute("SELECT nome, status FROM platform.tenant WHERE id=%s", (tenant_id,))
+            cur.execute("SELECT nome, status, trial_expira_em FROM platform.tenant WHERE id=%s",
+                        (tenant_id,))
             trow = cur.fetchone()
         if trow and trow[1] == "cancelado":
             raise HTTPException(403, "O acesso desta empresa está suspenso. Fale com o suporte BoardOS.")
-        tenant = {"id": tenant_id, "nome": trow[0] if trow else "—"}
-    token = make_token(sub=row[0], nome=row[2], tenant_id=tenant_id, papel=row[4])
+        if trow and trow[1] == "trial" and trow[2] is not None and trow[2] < _dt.now(_tz.utc):
+            raise HTTPException(403, "Seu teste de 14 dias terminou. Fale com a gente para ativar seu plano.")
+        tenant = {"id": tenant_id, "nome": trow[0] if trow else "—",
+                  "status": trow[1] if trow else None,
+                  "trial_expira_em": trow[2].isoformat() if trow and trow[2] else None,
+                  "onboarding": _onboarding_estado(tenant_id)}
+    exp_limite = trow[2] if (tenant_id and trow and trow[1] == "trial" and trow[2] is not None) else None
+    token = make_token(sub=row[0], nome=row[2], tenant_id=tenant_id, papel=row[4], exp_limite=exp_limite)
     return {"token": token,
             "user": {"email": row[0], "nome": row[2], "papel": row[4]},
             "tenant": tenant}
+
+
+def _onboarding_estado(tenant_id: str) -> Optional[str]:
+    """pendente | confirmado | None (tenant sem linha de onboarding — antigo)."""
+    with tenant_session(tenant_id) as cur:
+        cur.execute("SELECT confirmado_em IS NOT NULL FROM jornada WHERE jornada='onboarding'")
+        r = cur.fetchone()
+    if r is None:
+        return None
+    return "confirmado" if r[0] else "pendente"
 
 
 @app.get("/me")
@@ -145,8 +162,13 @@ def me(user: dict = Depends(current)):
     tenant = None
     if user.get("tenant_id"):
         with platform_session() as cur:
-            cur.execute("SELECT nome FROM platform.tenant WHERE id=%s", (user["tenant_id"],))
-            tenant = {"id": user["tenant_id"], "nome": (cur.fetchone() or ["—"])[0]}
+            cur.execute("SELECT nome, status, trial_expira_em FROM platform.tenant WHERE id=%s",
+                        (user["tenant_id"],))
+            trow = cur.fetchone()
+        tenant = {"id": user["tenant_id"], "nome": trow[0] if trow else "—",
+                  "status": trow[1] if trow else None,
+                  "trial_expira_em": trow[2].isoformat() if trow and trow[2] else None,
+                  "onboarding": _onboarding_estado(user["tenant_id"])}
     return {"user": {"email": user["sub"], "nome": user.get("nome"), "papel": user.get("papel")},
             "tenant": tenant}
 
@@ -177,6 +199,50 @@ class TenantIn(BaseModel):
 TENANT_STATUS = ("trial", "ativo", "inadimplente", "cancelado")
 
 
+def _provisionar_tenant(cur, nome: str, status: str = "trial", *,
+                        segmento: Optional[str] = None, origem: str = "manual",
+                        trial_dias: Optional[int] = None,
+                        admin_email: Optional[str] = None,
+                        admin_senha: Optional[str] = None,
+                        admin_nome: Optional[str] = None):
+    """Cria tenant + assinatura v0 (+ admin opcional) num cursor platform aberto.
+
+    Devolve (tenant_id, slug, trial_expira_em|None). 409 se o e-mail já existir.
+    """
+    from boardos.crm import slugify
+    base_slug = slugify(nome)
+    slug = base_slug
+    for i in range(2, 30):
+        cur.execute("SELECT 1 FROM platform.tenant WHERE slug=%s", (slug,))
+        if not cur.fetchone():
+            break
+        slug = f"{base_slug}-{i}"
+    else:
+        slug = f"{base_slug}-{uuid.uuid4().hex[:6]}"   # muitos homônimos: sufixo único
+    expira = None
+    if trial_dias:
+        cur.execute("SELECT now() + make_interval(days => %s)", (trial_dias,))
+        expira = cur.fetchone()[0]
+    cur.execute(
+        "INSERT INTO platform.tenant (nome, slug, status, segmento, origem, trial_expira_em) "
+        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+        (nome, slug, status, segmento, origem, expira))
+    tid = str(cur.fetchone()[0])
+    cur.execute(
+        "INSERT INTO platform.assinatura (tenant_id, plano, base_mensal_cent, preco_por_1k_cent) "
+        "VALUES (%s,'v0',49900,900)", (tid,))
+    if admin_email:
+        email = admin_email.strip().lower()
+        cur.execute("SELECT 1 FROM platform.usuario_login WHERE lower(email)=%s", (email,))
+        if cur.fetchone():
+            raise HTTPException(409, "Já existe um usuário com esse e-mail.")
+        cur.execute(
+            "INSERT INTO platform.usuario_login (email, senha_hash, nome, tenant_id, papel) "
+            "VALUES (%s,%s,%s,%s,'admin_tenant')",
+            (email, hash_password(admin_senha), admin_nome, tid))
+    return tid, slug, expira
+
+
 @app.post("/tenants")
 def tenant_create(body: TenantIn, user: dict = Depends(current)):
     """Cadastra uma nova empresa (tenant) — opcionalmente já com o admin inicial."""
@@ -188,32 +254,111 @@ def tenant_create(body: TenantIn, user: dict = Depends(current)):
         raise HTTPException(400, "Status inválido.")
     if body.admin_email and (not body.admin_senha or len(body.admin_senha) < 8):
         raise HTTPException(400, "Senha inicial do admin: mínimo 8 caracteres.")
-    from boardos.crm import slugify
     with platform_session() as cur:
-        base_slug = slugify(nome)
-        slug = base_slug
-        for i in range(2, 30):
-            cur.execute("SELECT 1 FROM platform.tenant WHERE slug=%s", (slug,))
-            if not cur.fetchone():
-                break
-            slug = f"{base_slug}-{i}"
-        cur.execute(
-            "INSERT INTO platform.tenant (nome, slug, status) VALUES (%s,%s,%s) RETURNING id",
-            (nome, slug, body.status))
-        tid = str(cur.fetchone()[0])
-        cur.execute(
-            "INSERT INTO platform.assinatura (tenant_id, plano, base_mensal_cent, preco_por_1k_cent) "
-            "VALUES (%s,'v0',49900,900)", (tid,))
-        if body.admin_email:
-            email = body.admin_email.strip().lower()
-            cur.execute("SELECT 1 FROM platform.usuario_login WHERE lower(email)=%s", (email,))
-            if cur.fetchone():
-                raise HTTPException(409, "Já existe um usuário com o e-mail do admin.")
-            cur.execute(
-                "INSERT INTO platform.usuario_login (email, senha_hash, nome, tenant_id, papel) "
-                "VALUES (%s,%s,%s,%s,'admin_tenant')",
-                (email, hash_password(body.admin_senha), body.admin_nome, tid))
+        tid, slug, _ = _provisionar_tenant(
+            cur, nome, status=body.status, origem="manual",
+            admin_email=body.admin_email, admin_senha=body.admin_senha,
+            admin_nome=body.admin_nome)
     return {"id": tid, "slug": slug}
+
+
+# ------------------------------------------------------- cadastro (trial)
+SEGMENTOS = ("supermercado", "farmacia", "moda", "material_construcao", "pet",
+             "eletromoveis", "autopecas", "alimentacao", "outro")
+TRIAL_DIAS = 14
+
+
+class CadastroIn(BaseModel):
+    empresa: str
+    segmento: str
+    nome: str
+    email: str
+    senha: str
+    site: Optional[str] = None   # honeypot — humano deixa vazio
+
+
+# Rate-limit do cadastro público (in-memory): 3/h por IP e 2/h por e-mail.
+# OrderedDict com teto e descarte LRU — evita crescer sem limite se alguém
+# varrer o endpoint trocando de chave a cada chamada.
+from collections import OrderedDict as _OrderedDict  # noqa: E402
+_CAD_HITS: "_OrderedDict[str, list]" = _OrderedDict()
+_CAD_MAX_IP, _CAD_MAX_EMAIL, _CAD_JANELA, _CAD_MAX_CHAVES = 3, 2, 3600.0, 10000
+
+
+def _cad_estourou(chave: str, limite: int) -> bool:
+    import time as _t
+    agora = _t.time()
+    if len(_CAD_HITS) > _CAD_MAX_CHAVES:
+        for k in [k for k, v in _CAD_HITS.items() if not v or agora - v[-1] >= _CAD_JANELA]:
+            _CAD_HITS.pop(k, None)
+        while len(_CAD_HITS) > _CAD_MAX_CHAVES:
+            _CAD_HITS.popitem(last=False)
+    hits = [t for t in _CAD_HITS.get(chave, []) if agora - t < _CAD_JANELA]
+    estourou = len(hits) >= limite
+    if not estourou:
+        hits.append(agora)
+    _CAD_HITS[chave] = hits
+    _CAD_HITS.move_to_end(chave)
+    return estourou
+
+
+@app.post("/cadastro")
+def cadastro(body: CadastroIn, request: Request):
+    """Autoatendimento: cria a empresa em teste grátis de 14 dias + o usuário
+    dono (admin) e já devolve o token logado. Público — protegido por honeypot
+    e rate-limit simples por IP e por e-mail."""
+    if body.site:            # bot preencheu o campo invisível: finge sucesso
+        return {"ok": True}
+    email = body.email.strip().lower()
+    empresa = body.empresa.strip()
+    nome = body.nome.strip()
+    if not empresa:
+        raise HTTPException(400, "Informe o nome da empresa.")
+    if len(empresa) > 120:
+        raise HTTPException(400, "Nome da empresa muito longo (máx. 120 caracteres).")
+    if body.segmento not in SEGMENTOS:
+        raise HTTPException(400, "Escolha o segmento do seu varejo.")
+    if "@" not in email or "." not in email.split("@")[-1]:
+        raise HTTPException(400, "Informe um e-mail válido.")
+    if len(body.senha) < 8:
+        raise HTTPException(400, "Senha: mínimo 8 caracteres.")
+    # último hop do X-Forwarded-For: é o que o proxy confiável (Render) anexa;
+    # o primeiro é escrito pelo próprio cliente e é falsificável.
+    _xff = [p.strip() for p in (request.headers.get("x-forwarded-for") or "").split(",") if p.strip()]
+    ip = _xff[-1] if _xff else ((request.client.host if request.client else "") or "?")
+    if _cad_estourou("ip:" + ip, _CAD_MAX_IP) or _cad_estourou("em:" + email, _CAD_MAX_EMAIL):
+        raise HTTPException(429, "Muitos cadastros seguidos. Tente de novo em uma hora.")
+    for tentativa in (1, 2):
+        try:
+            with platform_session() as cur:
+                tid, _slug, expira = _provisionar_tenant(
+                    cur, empresa, status="trial", segmento=body.segmento,
+                    origem="self_service", trial_dias=TRIAL_DIAS,
+                    admin_email=email, admin_senha=body.senha, admin_nome=nome or None)
+                # onboarding nasce pendente — mesma transação: se isto falhar,
+                # tenant/assinatura/admin fazem rollback junto (tudo ou nada).
+                cur.execute("SELECT set_config('app.current_tenant', %s, true)", (tid,))
+                cur.execute(
+                    "INSERT INTO jornada (tenant_id, jornada, respostas) VALUES (%s,'onboarding','{}') "
+                    "ON CONFLICT (tenant_id, jornada) DO NOTHING", (tid,))
+            break
+        except HTTPException as e:
+            if e.status_code == 409:
+                raise HTTPException(409, 'Já existe uma conta com esse e-mail — use "Já sou cliente" para entrar.')
+            raise
+        except Exception as e:   # corrida de e-mail ou de slug
+            msg = str(e)
+            if "usuario_login" in msg:
+                raise HTTPException(409, 'Já existe uma conta com esse e-mail — use "Já sou cliente" para entrar.')
+            if "tenant_slug" in msg and tentativa == 1:
+                continue   # slug ocupado pela requisição concorrente: tenta de novo
+            raise
+    token = make_token(sub=email, nome=nome, tenant_id=tid, papel="admin_tenant", exp_limite=expira)
+    return {"token": token,
+            "user": {"email": email, "nome": nome, "papel": "admin_tenant"},
+            "tenant": {"id": tid, "nome": empresa, "status": "trial",
+                       "trial_expira_em": expira.isoformat() if expira else None,
+                       "onboarding": "pendente"}}
 
 
 @app.put("/tenants/{tid2}")
@@ -255,20 +400,24 @@ def admin_metricas(user: dict = Depends(current)):
                    (SELECT count(*) FROM platform.usuario_login u WHERE u.tenant_id = t.id),
                    COALESCE((SELECT m.registros FROM platform.medidor_uso m
                               WHERE m.tenant_id = t.id
-                                AND m.competencia = date_trunc('month', now())::date), 0)
+                                AND m.competencia = date_trunc('month', now())::date), 0),
+                   t.segmento, t.origem, t.trial_expira_em
               FROM platform.tenant t
               LEFT JOIN platform.assinatura a ON a.tenant_id = t.id
              ORDER BY t.nome
             """)
         empresas = []
         mrr = 0
-        for tid_, nome, status, base_c, preco1k_c, nusers, registros in cur.fetchall():
+        for (tid_, nome, status, base_c, preco1k_c, nusers, registros,
+             segmento, origem, trial_exp) in cur.fetchall():
             receita = int(base_c) + int(int(registros) / 1000 * int(preco1k_c))
             if status in ("ativo", "trial"):
                 mrr += receita
             empresas.append({"id": str(tid_), "nome": nome, "status": status,
                              "usuarios": int(nusers), "registros_mes": int(registros),
-                             "base_cent": int(base_c), "receita_estimada_cent": receita})
+                             "base_cent": int(base_c), "receita_estimada_cent": receita,
+                             "segmento": segmento, "origem": origem,
+                             "trial_expira_em": trial_exp.isoformat() if trial_exp else None})
     ativos = sum(1 for e in empresas if e["status"] in ("ativo", "trial"))
     return {"empresas": empresas,
             "totais": {"tenants": len(empresas), "ativos": ativos,
@@ -2286,6 +2435,191 @@ def jornadas_resumo(jkey: str, user: dict = Depends(current), tid: str = Depends
         cur.execute("UPDATE jornada SET resumo=%s, atualizado_em=now() "
                     "WHERE tenant_id=%s AND jornada=%s", (texto, tid, jkey))
     return {"resumo": texto, "fonte": fonte}
+
+
+# ══════════════════ onboarding (primeiro modelo de ação) ══════════════════
+class OnboardingIn(BaseModel):
+    respostas: Dict[str, str]
+
+    @field_validator("respostas")
+    @classmethod
+    def _tamanho_ok(cls, v):
+        if len(v) > 30:
+            raise ValueError("muitas respostas de uma vez")
+        for k, val in v.items():
+            if len(k) > 40 or len(val or "") > 4000:
+                raise ValueError("resposta muito longa")
+        return v
+
+
+@app.get("/onboarding")
+def onboarding_get(tid: str = Depends(tenant_of)):
+    """Roteiro da entrevista + respostas salvas + modelo proposto (se houver)."""
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT respostas, modelo, confirmado_em FROM jornada "
+                    "WHERE tenant_id=%s AND jornada='onboarding'", (tid,))
+        row = cur.fetchone()
+    return {"perguntas": onb.PERGUNTAS, "obrigatorias": list(onb.OBRIGATORIAS),
+            "respostas": (row[0] if row else {}) or {},
+            "modelo": row[1] if row else None,
+            "confirmado": bool(row and row[2])}
+
+
+@app.put("/onboarding")
+def onboarding_put(body: OnboardingIn, user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    import json as _json
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("INSERT INTO jornada (tenant_id, jornada, respostas, atualizado_em) "
+                    "VALUES (%s,'onboarding',%s,now()) ON CONFLICT (tenant_id, jornada) DO UPDATE SET "
+                    "respostas=EXCLUDED.respostas, atualizado_em=now()",
+                    (tid, _json.dumps(body.respostas)))
+    return {"ok": True}
+
+
+@app.post("/onboarding/modelo")
+def onboarding_modelo(user: dict = Depends(current), tid: str = Depends(tenant_of)):
+    """Gera o Primeiro Modelo de Ação: IA em JSON estrito com validação e um
+    retry; sem IA, fallback determinístico (nunca bloqueia o fluxo)."""
+    import json as _json
+    _can_edit(user)
+    with tenant_session(tid) as cur:
+        cur.execute("SELECT respostas FROM jornada WHERE tenant_id=%s AND jornada='onboarding'", (tid,))
+        row = cur.fetchone()
+    respostas = (row[0] if row else {}) or {}
+    if [k for k in onb.OBRIGATORIAS if not (respostas.get(k) or "").strip()]:
+        raise HTTPException(400, "Responda as perguntas obrigatórias antes de gerar o modelo.")
+    with platform_session() as cur:
+        cur.execute("SELECT nome, segmento FROM platform.tenant WHERE id=%s", (tid,))
+        trow = cur.fetchone()
+    empresa = trow[0] if trow else "sua empresa"
+    segmento = (trow[1] if trow else None) or "outro"
+    ano = _dt.now(_tz.utc).year
+    qa = "\n\n".join(f"P: {p['q']}\nR: {respostas[p['k']].strip()}"
+                     for p in onb.PERGUNTAS if (respostas.get(p["k"]) or "").strip())
+    modelo, fonte = None, "modelo"
+    if advisor.disponivel():
+        system = onb.system_modelo(segmento, empresa, ano)
+        texto = advisor._chamada(system, qa, 3500)
+        for tentativa in range(2):
+            if not texto:
+                break
+            try:
+                modelo = onb.validar_modelo(onb.parse_modelo(texto)).model_dump()
+                fonte = "ia"
+                break
+            except Exception as e:
+                texto = advisor._chamada(
+                    system, qa + f"\n\nSua resposta anterior era inválida ({e}). "
+                    "Responda novamente SOMENTE com o JSON corrigido.", 3500) if tentativa == 0 else None
+    if modelo is None:
+        modelo = onb.validar_modelo(
+            onb.modelo_fallback(respostas, empresa, segmento, ano)).model_dump()
+    with tenant_session(tid) as cur:
+        cur.execute("UPDATE jornada SET modelo=%s, atualizado_em=now() "
+                    "WHERE tenant_id=%s AND jornada='onboarding'", (_json.dumps(modelo), tid))
+        if cur.rowcount == 0:   # tenant antigo, sem a linha semeada no cadastro
+            cur.execute("INSERT INTO jornada (tenant_id, jornada, respostas, modelo) "
+                        "VALUES (%s,'onboarding',%s,%s)",
+                        (tid, _json.dumps(respostas), _json.dumps(modelo)))
+    return {"modelo": modelo, "fonte": fonte}
+
+
+@app.post("/onboarding/confirmar")
+def onboarding_confirmar(body: onb.ModeloAcao, user: dict = Depends(current),
+                         tid: str = Depends(tenant_of)):
+    """Grava o modelo REVISADO pelo dono nas telas reais — nada nasce sem esta
+    confirmação — e semeia rituais e PIs padrão se ainda não existirem.
+    Transação única (commit no fechamento da tenant_session)."""
+    import json as _json
+    _can_edit(user)
+    try:
+        m = onb.validar_modelo(body.model_dump())
+    except Exception as e:
+        raise HTTPException(400, f"Modelo inválido: {e}")
+    ano = _dt.now(_tz.utc).year
+    criados = {"swot": 0, "okrs": 0, "krs": 0, "iniciativas": 0, "acoes": 0,
+               "rituais": False, "pis": False}
+    with tenant_session(tid) as cur:
+        # serializa aprovações concorrentes do mesmo tenant (ex.: duplo clique
+        # + reload); o 2º request só segue depois do commit do 1º.
+        cur.execute("SELECT pg_advisory_xact_lock(hashtextextended('onboarding_confirmar:'||%s::text, 0))",
+                    (tid,))
+        cur.execute("SELECT confirmado_em FROM jornada "
+                    "WHERE tenant_id=%s AND jornada='onboarding'", (tid,))
+        row = cur.fetchone()
+        if row and row[0]:
+            raise HTTPException(409, "Onboarding já aprovado.")
+        cur.execute("SELECT (SELECT count(*) FROM okr_objetivo) "
+                    "+ (SELECT count(*) FROM direcao_estrategica) "
+                    "+ (SELECT count(*) FROM swot_item)")
+        if cur.fetchone()[0]:
+            # o dono já montou parte do plano na mão (ex.: "Concluir depois" e
+            # cadastrou OKR/Direção/SWOT antes de voltar ao onboarding) — não
+            # sobrescrevemos nada, mas fechamos o onboarding para não prender
+            # o usuário num wizard que nunca mais vai conseguir aprovar.
+            cur.execute(
+                "INSERT INTO jornada (tenant_id, jornada, respostas, confirmado_em, atualizado_em) "
+                "VALUES (%s,'onboarding','{}',now(),now()) "
+                "ON CONFLICT (tenant_id, jornada) DO UPDATE SET confirmado_em=now(), atualizado_em=now()",
+                (tid,))
+            return {"ok": True, "ja_tinha_plano": True, "criados": criados}
+        d = m.direcao
+        cur.execute(
+            "INSERT INTO direcao_estrategica (tenant_id, proposito, visao, valores, objetivo_lp, competencia, atualizado_em) "
+            "VALUES (%s,%s,%s,%s,%s,%s,now()) ON CONFLICT (tenant_id) DO UPDATE SET "
+            "proposito=EXCLUDED.proposito, visao=EXCLUDED.visao, valores=EXCLUDED.valores, "
+            "objetivo_lp=EXCLUDED.objetivo_lp, competencia=EXCLUDED.competencia, atualizado_em=now()",
+            (tid, d.proposito, d.visao, "\n".join(d.valores) or None, d.objetivo_lp, d.competencia))
+        for campo, qd in (("forcas", "forca"), ("fraquezas", "fraqueza"),
+                          ("oportunidades", "oportunidade"), ("ameacas", "ameaca")):
+            for i, txt in enumerate(getattr(m.swot, campo)):
+                cur.execute("INSERT INTO swot_item (tenant_id, quadrante, texto, ordem) "
+                            "VALUES (%s,%s,%s,%s)", (tid, qd, txt, i))
+                criados["swot"] += 1
+        obj_ids = []
+        for i, o in enumerate(m.okrs):
+            cur.execute("INSERT INTO okr_objetivo (tenant_id, titulo, periodo, nivel, ordem) "
+                        "VALUES (%s,%s,%s,'corporativo',%s) RETURNING id",
+                        (tid, o.objetivo, o.periodo or str(ano), i))
+            oid = str(cur.fetchone()[0])
+            obj_ids.append(oid)
+            criados["okrs"] += 1
+            for j, kr in enumerate(o.krs):
+                cur.execute("INSERT INTO okr_kr (tenant_id, objetivo_id, titulo, unidade, meta, atual, base, direcao, ordem) "
+                            "VALUES (%s,%s,%s,%s,%s,0,%s,%s,%s)",
+                            (tid, oid, kr.titulo, kr.unidade, kr.meta, kr.base, kr.direcao, j))
+                criados["krs"] += 1
+        for ini in m.iniciativas:
+            obj_id = obj_ids[ini.objetivo_idx] if ini.objetivo_idx is not None else None
+            cur.execute("INSERT INTO iniciativa (tenant_id, nome, objetivo_id) "
+                        "VALUES (%s,%s,%s) RETURNING id", (tid, ini.nome, obj_id))
+            iid = str(cur.fetchone()[0])
+            criados["iniciativas"] += 1
+            for a in ini.acoes:
+                cur.execute("INSERT INTO acao_5w2h (tenant_id, objetivo_id, iniciativa_id, oque, porque, onde, quando, quem, como, quanto) "
+                            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                            (tid, obj_id, iid, a.oque, a.porque, a.onde, a.quando, a.quem, a.como, a.quanto))
+                criados["acoes"] += 1
+        cur.execute("SELECT count(*) FROM ritual")
+        if not cur.fetchone()[0]:
+            for i, (fq, nm, qm, ob, px) in enumerate(RITUAIS_PADRAO):
+                cur.execute("INSERT INTO ritual (tenant_id, freq, nome, quem, objetivo, proxima, ordem) "
+                            "VALUES (%s,%s,%s,%s,%s,%s,%s)", (tid, fq, nm, qm, ob, px, i))
+            criados["rituais"] = True
+        cur.execute("SELECT count(*) FROM pi")
+        if not cur.fetchone()[0]:
+            for chave, nome, pilar, jornada, direcao, ordem in PIS_PADRAO:
+                cur.execute("INSERT INTO pi (tenant_id, chave, nome, pilar, jornada, direcao, ordem, fonte) "
+                            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                            (tid, chave, nome, pilar, jornada, direcao, ordem, "importação de vendas"))
+            criados["pis"] = True
+        cur.execute("INSERT INTO jornada (tenant_id, jornada, respostas, modelo, confirmado_em, atualizado_em) "
+                    "VALUES (%s,'onboarding','{}',%s,now(),now()) "
+                    "ON CONFLICT (tenant_id, jornada) DO UPDATE SET "
+                    "modelo=EXCLUDED.modelo, confirmado_em=now(), atualizado_em=now()",
+                    (tid, _json.dumps(m.model_dump())))
+    return {"ok": True, "criados": criados}
 
 
 # ═══════════════════════════ perfil do usuário ═══════════════════════════

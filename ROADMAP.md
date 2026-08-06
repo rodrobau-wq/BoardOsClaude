@@ -73,7 +73,9 @@
 ### BLOCO 5 — Qualidade e segurança (antes de cliente real)
 | # | Item | O que entrega |
 |---|------|---------------|
+| 5.0 | **E-mail transacional** | Provedor (Resend/SES) → verificação do e-mail no cadastro, "esqueci a senha", boas-vindas e aviso de fim de trial. **Sem isso, o cadastro público tem 3 limitações aceitas no v1**: (a) e-mail nunca é verificado — quem digita errado fica com conta órfã e a recuperação é manual pelo super-admin; (b) o 409 "já existe conta com esse e-mail" é um oráculo de enumeração de contas (o login não revela isso); (c) um e-mail pode ser "prendido" por quem não o controla. A correção real é duplo opt-in: gravar a intenção e só provisionar quando o link do e-mail for clicado |
 | 5.1 | **Endurecer produção** | Remover SEED_DEMO, trocar senha do admin, CORS restrito, rate-limit no login |
+| 5.1b | **Rate-limit persistente** | Hoje o limite do `/cadastro` (3/h por IP, 2/h por e-mail) é in-memory: zera a cada deploy/hibernação do plano free e não escala horizontalmente. Mover para tabela em `platform.*` ou Redis; avaliar CAPTCHA se houver abuso real |
 | 5.2 | **Testes de API** | Suíte automatizada dos endpoints (hoje só o motor tem testes) |
 | 5.3 | **Plano pago do web service** | Sem cold start (hoje o serviço grátis dorme) — ação sua no Render |
 | 5.4 | **Backup/observabilidade** | Rotina de backup do Postgres + logs/alertas de erro |

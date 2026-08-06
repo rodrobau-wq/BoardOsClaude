@@ -408,6 +408,25 @@
     #portal .pt-cli{display:none}
     #portal .pt-cta{padding:0 12px}
   }
+  /* ---- Onboarding (entrevista + revisão do primeiro modelo) ---- */
+  #onboarding{min-height:100vh;background:var(--ground);color:var(--ink)}
+  .onb-head{display:flex;align-items:center;gap:12px;height:58px;padding:0 22px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .onb-body{max-width:780px;margin:0 auto;padding:34px 22px 90px}
+  .onb-prog{height:6px;border-radius:999px;background:var(--surface-2);overflow:hidden;border:1px solid var(--border)}
+  .onb-prog>div{height:100%;width:0;background:var(--accent);transition:width .3s}
+  .onb-chip{display:inline-flex;height:22px;padding:0 10px;border-radius:999px;background:var(--surface-2);color:var(--ink-2);font-size:11px;font-weight:700;align-items:center;text-transform:uppercase;letter-spacing:.5px}
+  #onbInput{width:100%;box-sizing:border-box;min-height:112px;border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:9px;padding:10px 12px;font:13.5px/1.5 var(--font);resize:vertical}
+  .rv-card{border:1px dashed var(--ia);border-radius:12px;background:var(--surface);margin-bottom:14px;padding:16px 17px}
+  .rv-tag{font-size:11px;font-weight:700;color:var(--ia);margin-bottom:8px;display:block;text-transform:uppercase;letter-spacing:.4px}
+  .rv-card input,.rv-card textarea{border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:8px;padding:7px 10px;font:13px var(--font);box-sizing:border-box}
+  .rv-card textarea{width:100%;min-height:54px;resize:vertical}
+  .rv-row{display:flex;gap:8px;margin-top:6px;align-items:center}
+  .rv-del{cursor:pointer;color:var(--muted);font-weight:700;background:none;border:none;font-size:15px;padding:2px 6px;flex:none}
+  .rv-del:hover{color:var(--crit)}
+  .rv-add{background:none;border:none;color:var(--accent);font:12.5px var(--font);font-weight:600;cursor:pointer;padding:7px 0 0}
+  .rv-grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:700px){.rv-grid2{grid-template-columns:1fr}}
+  .rv-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 3px;display:block}
 </style>
 </head>
 <body>
@@ -426,22 +445,22 @@
   <div class="pt-hero">
     <div class="pt-wrap pt-hero-grid">
       <div>
-        <span class="pt-pill-ia">✦ IA aplicada à gestão · varejo supermercadista</span>
-        <h1>A sala de comando da sua rede de supermercados</h1>
+        <span class="pt-pill-ia">✦ IA aplicada à gestão · varejo</span>
+        <h1>A sala de comando do seu varejo</h1>
         <p class="pt-sub">Planejar, acompanhar a execução e validar o resultado — o ciclo que hoje não fecha. O BoardOS junta seus números, seus rituais e cinco agentes de IA num só cockpit.</p>
         <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <button class="pt-cta pt-cta-lg pt-tocred">Acessar plataforma →</button>
+          <button class="pt-cta pt-cta-lg pt-tocad">Começar teste grátis →</button>
           <a href="#planos" class="pt-ghost-lg">Conhecer os planos</a>
         </div>
         <div class="pt-stats">
-          <span><b>14 redes</b>rodando no interior de SP</span>
+          <span><b>14 redes</b>de varejo no cockpit</span>
           <span><b>180 lojas</b>conectadas ao ERP</span>
           <span><b>5 agentes</b>de IA no seu ritual de gestão</span>
         </div>
       </div>
       <div style="position:relative">
         <div class="pt-mock">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><b style="font-size:13px">Dashboard Executivo · Supermercados Andrade</b><span class="pt-live"><i></i>ao vivo</span></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><b style="font-size:13px">Dashboard Executivo · Rede Andrade</b><span class="pt-live"><i></i>ao vivo</span></div>
           <div class="pt-mock-grid">
             <div><div class="k">Venda hoje</div><div class="v">R$ 148k</div><div class="d" style="color:#157A47">▲ +6,2% vs D-7</div></div>
             <div><div class="k">Margem bruta</div><div class="v">23,1%</div><div class="d" style="color:#B37B0A">meta 24,0%</div></div>
@@ -457,7 +476,7 @@
   <div style="border-bottom:1px solid #E6ECF3">
     <div class="pt-wrap pt-redes">
       <span class="pt-eyebrow">Redes que rodam no BoardOS</span>
-      <span>Supermercados Andrade</span><span>Rede Bom Preço</span><span>Grupo Santa Fé</span><span>Mercado União</span><span>Comercial Vila Nova</span>
+      <span>Rede Andrade</span><span>Rede Bom Preço</span><span>Grupo Santa Fé</span><span>Mercado União</span><span>Comercial Vila Nova</span>
     </div>
   </div>
 
@@ -502,8 +521,8 @@
         <p>Em 30 minutos conectamos seu ERP e você vê a sua rede no cockpit.</p>
       </div>
       <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <button class="pt-cta pt-cta-lg pt-tocred">Acessar plataforma →</button>
-        <button class="pt-ghost-lg pt-tocred">Falar com especialista</button>
+        <button class="pt-cta pt-cta-lg pt-tocad">Começar teste grátis →</button>
+        <button class="pt-ghost-lg pt-tocad">Falar com especialista</button>
       </div>
     </div>
   </div>
@@ -511,6 +530,59 @@
   <div class="pt-wrap pt-foot">
     <span><b style="color:#10202E">BoardOS</b> · Direção Cockpit Executivo</span><span style="flex:1"></span>
     <span>LGPD by design</span><span>Integração Consinco · RP · Zanthus</span><span>© 2026</span>
+  </div>
+</div>
+
+<!-- Onboarding: entrevista guiada + revisão do Primeiro Modelo de Ação -->
+<div id="onboarding" class="hide">
+  <div class="onb-head">
+    <div style="display:flex;align-items:center;gap:9px"><div class="pt-logo">B</div><b style="font-size:15px">BoardOS</b></div>
+    <span id="onbEmpresa" style="color:var(--muted);font-size:13px"></span>
+    <span style="flex:1"></span>
+    <a href="#" id="onbDepois" style="font-size:12.5px;color:var(--muted);text-decoration:none">Concluir depois →</a>
+  </div>
+  <div class="onb-body">
+
+    <div id="onbWizard">
+      <h1 style="font-size:22px;letter-spacing:-.4px;margin:0 0 6px">Vamos montar seu primeiro plano</h1>
+      <p style="color:var(--muted);font-size:13.5px;margin:0 0 18px;max-width:60ch">Responda do seu jeito — leva uns 10 minutos e você pode pausar quando quiser. No fim, o Conselheiro <span style="color:var(--ia)">✦</span> organiza tudo num primeiro modelo de ação. <b>Nada é gravado sem a sua aprovação.</b></p>
+      <div class="onb-prog"><div id="onbBarra"></div></div>
+      <div id="onbProg" style="font-size:12px;color:var(--muted);margin:6px 0 14px"></div>
+      <section class="card">
+        <div class="body">
+          <span id="onbBloco" class="onb-chip"></span>
+          <div id="onbPergunta" style="font-size:16.5px;font-weight:600;line-height:1.4;margin:10px 0 8px"></div>
+          <ul id="onbDica" style="margin:0 0 12px;padding-left:18px;color:var(--muted);font-size:12.5px;line-height:1.65"></ul>
+          <textarea id="onbInput"></textarea>
+          <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap">
+            <button class="btn ghost" id="onbAnt">‹ Anterior</button>
+            <button class="btn" id="onbSalvar">Salvar e avançar</button>
+            <button class="linklike" id="onbPular" style="color:var(--muted)">Pular esta →</button>
+            <span style="flex:1"></span>
+            <span id="onbHint" style="font-size:12px;color:var(--muted)"></span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div id="onbGerando" class="hide" style="text-align:center;padding:70px 0">
+      <div style="font-size:36px;color:var(--ia)">✦</div>
+      <h2 style="font-size:19px;margin:12px 0 6px">Gerando seu primeiro modelo de ação…</h2>
+      <p style="color:var(--muted);font-size:13.5px;margin:0">O Conselheiro está transformando suas respostas em direção, diagnóstico, metas e plano de ataque.</p>
+    </div>
+
+    <div id="onbRevisao" class="hide">
+      <h1 style="font-size:22px;letter-spacing:-.4px;margin:0 0 6px">Seu primeiro modelo de ação</h1>
+      <p style="color:var(--muted);font-size:13.5px;margin:0 0 18px;max-width:62ch">Tudo abaixo é <b style="color:var(--ia)">✦ proposta do Conselheiro</b> a partir das suas respostas. Ajuste o que quiser — depois de aprovar, tudo continua editável no painel.</p>
+      <div id="onbRevCards"></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:18px;flex-wrap:wrap">
+        <button class="btn" id="onbAprovar" style="background:var(--good);border-color:var(--good)">Aprovar e criar meu painel</button>
+        <button class="btn ghost" id="onbRegerar">✦ Gerar de novo</button>
+        <span id="onbRevErr" style="font-size:12.5px;color:var(--muted)"></span>
+      </div>
+      <p style="color:var(--faint);font-size:11.5px;margin-top:10px">Nada é gravado sem a sua aprovação. O verde é o seu ato de dono.</p>
+    </div>
+
   </div>
 </div>
 <div class="app">
@@ -578,6 +650,8 @@
   </div>
 </div>
 
+<div id="trialBar" class="hide" style="margin:10px 22px 0;padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);font-size:12.5px;color:var(--ink-2)"></div>
+
 <div class="wrap">
   <div id="login" class="login-card">
     <a href="#" id="voltarSite" style="display:inline-block;font-size:12px;font-weight:600;color:var(--muted);text-decoration:none;margin-bottom:4px">← Voltar ao site</a>
@@ -587,8 +661,35 @@
     <input id="senha" type="password" placeholder="senha" autocomplete="current-password">
     <button class="btn" id="entrar">Entrar</button>
     <div class="err" id="loginErr"></div>
-    <div class="hint">Acesso restrito — fale com o administrador da sua rede.</div>
+    <div class="hint">Sua empresa ainda não tem conta? <a href="#" id="irCadastro" style="color:var(--accent);font-weight:600;text-decoration:none">Comece o teste grátis →</a></div>
     <div id="buildInfoLogin" style="margin-top:10px;font-size:10px;color:var(--faint)"></div>
+  </div>
+
+  <div id="cadastro" class="login-card hide">
+    <a href="#" id="voltarSiteCad" style="display:inline-block;font-size:12px;font-weight:600;color:var(--muted);text-decoration:none;margin-bottom:4px">← Voltar ao site</a>
+    <h2>Criar minha conta</h2>
+    <div class="lead">Teste grátis de 14 dias · sem cartão de crédito</div>
+    <input id="cadEmpresa" type="text" placeholder="nome da empresa" autocomplete="organization">
+    <select id="cadSegmento" style="border:1px solid var(--border);background:var(--surface-2);color:var(--ink);border-radius:9px;padding:10px 12px;font:13.5px var(--font)">
+      <option value="">— segmento do seu varejo —</option>
+      <option value="supermercado">Supermercado</option>
+      <option value="farmacia">Farmácia</option>
+      <option value="moda">Moda e vestuário</option>
+      <option value="material_construcao">Material de construção</option>
+      <option value="pet">Pet</option>
+      <option value="eletromoveis">Eletro e móveis</option>
+      <option value="autopecas">Autopeças</option>
+      <option value="alimentacao">Alimentação</option>
+      <option value="outro">Outro varejo</option>
+    </select>
+    <input id="cadNome" type="text" placeholder="seu nome" autocomplete="name">
+    <input id="cadEmail" type="email" placeholder="seu e-mail" autocomplete="email">
+    <input id="cadSenha" type="password" placeholder="senha (mínimo 8 caracteres)" autocomplete="new-password">
+    <input id="cadSite" name="contato_hp" type="text" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;border:0;padding:0">
+    <button class="btn" id="cadCriar">Criar minha conta — teste grátis</button>
+    <div class="err" id="cadErr"></div>
+    <div class="hint">Já tem conta? <a href="#" id="irLogin" style="color:var(--accent);font-weight:600;text-decoration:none">Entrar →</a></div>
+    <div class="hint" style="margin-top:4px">Seus dados ficam isolados e protegidos — LGPD by design.</div>
   </div>
 
   <div id="status" class="msg info hide">Clique <b>Carregar</b>.</div>
@@ -906,7 +1007,7 @@
       </header>
       <div class="body" style="overflow-x:auto">
         <table class="tbl" id="cliTbl">
-          <thead><tr><th>Empresa</th><th>Status</th><th>Usuários</th><th>Registros no mês</th><th>Receita est./mês</th><th></th></tr></thead>
+          <thead><tr><th>Empresa</th><th>Segmento</th><th>Status</th><th>Trial até</th><th>Usuários</th><th>Registros no mês</th><th>Receita est./mês</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -1243,9 +1344,7 @@
 <script src="versao.js"></script>
 <script>
 "use strict";
-var API = location.hostname === "localhost" || location.protocol === "file:"
-  ? "https://boardos-api.onrender.com"
-  : (window.BOARDOS_API || "https://boardos-api.onrender.com");
+var API = window.BOARDOS_API || "https://boardos-api.onrender.com";
 var lens = "civil";
 var last = null;
 var PAPEL = null;
@@ -1883,21 +1982,29 @@ async function loadAdmin(){
     }).join("");
     var tb = el("cliTbl").querySelector("tbody");
     tb.innerHTML = cliCache.map(function(c2, i){
-      return "<tr><td>"+c2.nome+"</td>"+
+      var trialTd = "—";
+      if(c2.trial_expira_em){
+        var venc = new Date(c2.trial_expira_em).getTime() < Date.now();
+        trialTd = '<span style="'+(venc?"color:var(--crit);font-weight:600":"")+'">'+
+          new Date(c2.trial_expira_em).toLocaleDateString("pt-BR")+(venc?" · vencido":"")+'</span>';
+      }
+      return "<tr><td>"+esc(c2.nome)+(c2.origem==="self_service"?' <span class="hint" title="Cadastro pelo site">· site</span>':"")+"</td>"+
+        '<td>'+esc(c2.segmento||"—")+'</td>'+
         '<td><span class="chipst '+(CLI_STCLS[c2.status]||"")+'">'+(CLI_ST[c2.status]||c2.status)+'</span></td>'+
+        '<td>'+trialTd+'</td>'+
         '<td class="num">'+c2.usuarios+'</td>'+
         '<td class="num">'+c2.registros_mes.toLocaleString("pt-BR")+'</td>'+
         '<td class="num">'+brlCent(c2.receita_estimada_cent)+'</td>'+
         '<td style="text-align:right"><span class="obj-actions">'+
         '<button class="ib" data-cact="e" data-ci="'+i+'" title="Editar">✎</button>'+
         '<button class="ib danger" data-cact="x" data-ci="'+i+'" title="Excluir definitivamente">×</button></span></td></tr>';
-    }).join("") || '<tr><td colspan="6" class="hint">Nenhum cliente ainda.</td></tr>';
+    }).join("") || '<tr><td colspan="8" class="hint">Nenhum cliente ainda.</td></tr>';
   }catch(e){
     el("admKpis").innerHTML = '<span class="hint">Não foi possível carregar: '+e.message+'</span>';
   }
 }
 function editorCliente(c2, anchor){
-  var fields = [{k:"nome", label:"Empresa", cls:"w-lg", value:c2?c2.nome:"", ph:"ex.: Supermercados Silva"}];
+  var fields = [{k:"nome", label:"Empresa", cls:"w-lg", value:c2?c2.nome:"", ph:"ex.: Rede Silva"}];
   if(c2){
     fields.push({k:"status", label:"Status", type:"select", value:c2.status,
       options:[["trial","Trial"],["ativo","Ativo"],["inadimplente","Inadimplente"],["cancelado","Suspenso"]]});
@@ -2342,8 +2449,8 @@ async function renderChecklist(){
   var dados = !!(last && last.atual && last.atual.length);
   var metasOk = okrCache.length > 0;
   var acaoOk = fcaCache.length > 0;
-  var descOk = false;
-  try{
+  var descOk = ME_ONBOARDING === "confirmado";
+  if(!descOk) try{
     var d = await jget("/descoberta");
     descOk = (d.obrigatorias||[]).length > 0 &&
       (d.obrigatorias||[]).every(function(k){ return ((d.respostas||{})[k]||"").trim(); });
@@ -3076,6 +3183,9 @@ function drawChart(){
 
 function showLogin(msg){
   el("login").classList.remove("hide");
+  el("cadastro").classList.add("hide");
+  el("onboarding").classList.add("hide");
+  el("trialBar").classList.add("hide");
   el("cfg").classList.add("hide");
   el("content").classList.add("hide");
   el("status").classList.add("hide");
@@ -3104,8 +3214,10 @@ function showLogin(msg){
 }
 function showApp(tenantNome){
   el("portal").classList.add("hide");
+  el("onboarding").classList.add("hide");
   document.querySelector(".app").classList.remove("hide");
   el("login").classList.add("hide");
+  el("cadastro").classList.add("hide");
   el("cfg").classList.remove("hide");
   el("sidebar").classList.remove("hide");
   renderCicloPill();
@@ -3173,7 +3285,7 @@ function renderPortal(){
       '<div class="preco"><b>'+p.preco+'</b><span> '+p.per+'</span></div>'+
       '<div class="nota">'+p.nota+'</div>'+
       '<div class="itens">'+p.itens.map(function(it){return '<div><span class="ok">✓</span><span>'+it+'</span></div>';}).join("")+'</div>'+
-      '<button class="pt-tocred">'+p.cta+'</button></div>';
+      '<button class="pt-tocad">'+p.cta+'</button></div>';
   }).join("");
   el("ptPacks").innerHTML = PORTAL_DADOS.packs.map(function(c){
     return '<div class="pt-pack'+(c.dest?' dest':'')+'"><b class="n">'+c.nome+'</b>'+
@@ -3187,19 +3299,342 @@ function renderPortal(){
   Array.prototype.forEach.call(document.querySelectorAll("#portal .pt-tocred"), function(b){
     b.addEventListener("click", function(ev){ ev.preventDefault(); mostrarCred(); });
   });
+  Array.prototype.forEach.call(document.querySelectorAll("#portal .pt-tocad"), function(b){
+    b.addEventListener("click", function(ev){ ev.preventDefault(); mostrarCadastro(); });
+  });
 }
 function mostrarPortal(){
   el("portal").classList.remove("hide");
   document.querySelector(".app").classList.add("hide");
+  el("onboarding").classList.add("hide");
   el("loginErr").textContent = "";
+  el("cadErr").textContent = "";
   window.scrollTo(0,0);
 }
 function mostrarCred(){
   el("portal").classList.add("hide");
   document.querySelector(".app").classList.remove("hide");
+  el("onboarding").classList.add("hide");
+  el("cadastro").classList.add("hide");
+  el("login").classList.remove("hide");
   window.scrollTo(0,0);
   try{ el("email").focus(); }catch(e){}
 }
+function mostrarCadastro(){
+  el("portal").classList.add("hide");
+  document.querySelector(".app").classList.remove("hide");
+  el("onboarding").classList.add("hide");
+  el("login").classList.add("hide");
+  el("cadastro").classList.remove("hide");
+  el("cadErr").textContent = "";
+  window.scrollTo(0,0);
+  try{ el("cadEmpresa").focus(); }catch(e){}
+}
+async function cadastrar(){
+  var empresa = el("cadEmpresa").value.trim(), seg = el("cadSegmento").value,
+      nome = el("cadNome").value.trim(), email = el("cadEmail").value.trim(),
+      senha = el("cadSenha").value;
+  if(!empresa || !seg || !nome || !email || !senha){
+    el("cadErr").textContent = "Preencha todos os campos."; return;
+  }
+  if(senha.length < 8){ el("cadErr").textContent = "Senha: mínimo 8 caracteres."; return; }
+  el("cadErr").textContent = "Criando sua conta…";
+  try{
+    var r = await fetch(API+"/cadastro", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({empresa:empresa, segmento:seg, nome:nome, email:email, senha:senha,
+                            site: el("cadSite").value || null})});
+    var j = await r.json().catch(function(){return {};});
+    if(!r.ok){ el("cadErr").textContent = (j.detail || "Não foi possível criar a conta agora."); return; }
+    if(!j.token || !j.user){
+      el("cadErr").textContent = "Não foi possível criar a conta agora. Recarregue a página e tente de novo.";
+      return;
+    }
+    setToken(j.token);
+    PAPEL = j.user.papel;
+    setUsuario(j.user.nome || j.user.email, j.user.papel);
+    enterOnboarding(j.tenant);
+  }catch(e){
+    el("cadErr").textContent = "Erro de conexão (o serviço pode estar acordando — leva até 1 min). Tente de novo.";
+  }
+}
+
+/* ---- Onboarding: entrevista guiada + Primeiro Modelo de Ação ---- */
+var ONB = {perguntas:[], obrig:[], respostas:{}, modelo:null, idx:0, tenant:null, confirmado:false};
+var ME_ONBOARDING = null;
+function qsa(sel, root){ return Array.prototype.slice.call((root||document).querySelectorAll(sel)); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+async function enterOnboarding(tenant){
+  ONB.tenant = tenant || null;
+  ME_ONBOARDING = tenant ? tenant.onboarding : null;
+  el("portal").classList.add("hide");
+  document.querySelector(".app").classList.add("hide");
+  el("onboarding").classList.remove("hide");
+  el("onbEmpresa").textContent = tenant && tenant.nome ? "· " + tenant.nome : "";
+  window.scrollTo(0,0);
+  try{
+    var r = await jget("/onboarding");
+    ONB.perguntas = r.perguntas || []; ONB.obrig = r.obrigatorias || [];
+    ONB.respostas = r.respostas || {}; ONB.modelo = r.modelo || null;
+    ONB.confirmado = !!r.confirmado;
+  }catch(e){ sairOnboarding(); return; }
+  if(ONB.confirmado || !ONB.perguntas.length){ sairOnboarding(); return; }
+  if(ONB.modelo){ mostrarRevisao(); return; }
+  ONB.idx = onbPrimeiraSemResposta();
+  el("onbGerando").classList.add("hide");
+  el("onbRevisao").classList.add("hide");
+  el("onbWizard").classList.remove("hide");
+  renderOnbPergunta();
+}
+function sairOnboarding(){
+  ME_ONBOARDING = ONB.confirmado ? "confirmado" : ME_ONBOARDING;
+  showApp(ONB.tenant ? ONB.tenant.nome : "—");
+  renderTrialBar(ONB.tenant);
+  return load();
+}
+function onbPrimeiraSemResposta(){
+  for(var i=0;i<ONB.perguntas.length;i++){
+    if(!(ONB.respostas[ONB.perguntas[i].k]||"").trim()) return i;
+  }
+  return ONB.perguntas.length - 1;
+}
+function onbContaRespondidas(){
+  var n=0;
+  for(var i=0;i<ONB.perguntas.length;i++){
+    if((ONB.respostas[ONB.perguntas[i].k]||"").trim()) n++;
+  }
+  return n;
+}
+function renderOnbPergunta(){
+  var p = ONB.perguntas[ONB.idx];
+  var n = onbContaRespondidas();
+  el("onbBarra").style.width = Math.round(100*n/ONB.perguntas.length)+"%";
+  el("onbProg").textContent = "Pergunta "+(ONB.idx+1)+" de "+ONB.perguntas.length+" · "+n+" respondidas";
+  el("onbBloco").textContent = p.bloco + (p.obrig ? "" : " · opcional");
+  el("onbPergunta").textContent = p.q;
+  el("onbDica").innerHTML = (p.dica||[]).map(function(d){ return "<li>"+esc(d)+"</li>"; }).join("");
+  el("onbInput").value = ONB.respostas[p.k] || "";
+  el("onbInput").placeholder = p.ph || "";
+  el("onbAnt").disabled = ONB.idx === 0;
+  el("onbPular").classList.toggle("hide", !!p.obrig);
+  el("onbSalvar").textContent = ONB.idx === ONB.perguntas.length-1 ? "Concluir ✦" : "Salvar e avançar";
+  el("onbHint").textContent = "";
+  try{ el("onbInput").focus(); }catch(e){}
+}
+async function onbAvancar(pular){
+  var p = ONB.perguntas[ONB.idx];
+  if(!pular){
+    var v = el("onbInput").value.trim();
+    if(p.obrig && !v){ el("onbHint").textContent = "Essa é essencial para montar o plano."; return; }
+    ONB.respostas[p.k] = v;
+    el("onbHint").textContent = "Salvando…";
+    try{ await jsend("PUT","/onboarding",{respostas: ONB.respostas}); el("onbHint").textContent = "Salvo ✓"; }
+    catch(e){ el("onbHint").textContent = "Não salvou agora — salvo de novo no próximo passo."; }
+  }
+  if(ONB.idx < ONB.perguntas.length-1){ ONB.idx++; renderOnbPergunta(); return; }
+  for(var i=0;i<ONB.perguntas.length;i++){
+    var q = ONB.perguntas[i];
+    if(q.obrig && !(ONB.respostas[q.k]||"").trim()){
+      ONB.idx = i; renderOnbPergunta();
+      el("onbHint").textContent = "Faltou esta obrigatória — é rapidinho.";
+      return;
+    }
+  }
+  gerarModelo();
+}
+async function gerarModelo(){
+  el("onbWizard").classList.add("hide");
+  el("onbRevisao").classList.add("hide");
+  el("onbGerando").classList.remove("hide");
+  window.scrollTo(0,0);
+  try{
+    var r = await jsend("POST","/onboarding/modelo",null);
+    ONB.modelo = r.modelo;
+    mostrarRevisao();
+  }catch(e){
+    el("onbGerando").classList.add("hide");
+    if(ONB.modelo){
+      el("onbRevisao").classList.remove("hide");
+      el("onbRevErr").textContent = "Não consegui gerar de novo agora — o modelo anterior segue abaixo. ("+e.message+")";
+    }else{
+      el("onbWizard").classList.remove("hide");
+      el("onbHint").textContent = "Não consegui gerar agora — tente de novo. ("+e.message+")";
+    }
+  }
+}
+function mostrarRevisao(){
+  el("onbWizard").classList.add("hide");
+  el("onbGerando").classList.add("hide");
+  el("onbRevisao").classList.remove("hide");
+  renderRevisao(ONB.modelo);
+  window.scrollTo(0,0);
+}
+function rvSwotRow(txt){
+  return '<div class="rv-row"><input value="'+esc(txt)+'" style="flex:1"><button class="rv-del" title="Remover">×</button></div>';
+}
+function rvKrRow(kr){
+  var extra = encodeURIComponent(JSON.stringify({base:(kr.base==null?null:kr.base),
+    direcao: kr.direcao==="down"?"down":"up"}));
+  return '<div class="rv-row rv-kr" style="padding-left:24px" data-extra="'+extra+'">' +
+    '<input class="rv-kr-t" style="flex:1" placeholder="resultado-chave" value="'+esc(kr.titulo||"")+'">' +
+    '<input class="rv-kr-m" type="number" step="any" style="width:92px" placeholder="meta" value="'+(kr.meta==null?"":esc(kr.meta))+'">' +
+    '<input class="rv-kr-u" style="width:70px" placeholder="un." value="'+esc(kr.unidade||"")+'">' +
+    '<button class="rv-del" title="Remover">×</button></div>';
+}
+function rvAcaoRow(a){
+  var extra = encodeURIComponent(JSON.stringify({porque:a.porque||null, onde:a.onde||null, como:a.como||null, quanto:(a.quanto==null?null:a.quanto)}));
+  return '<div class="rv-row rv-acao" style="padding-left:24px" data-extra="'+extra+'">' +
+    '<input class="rv-a-o" style="flex:2" placeholder="o quê" value="'+esc(a.oque||"")+'">' +
+    '<input class="rv-a-q" style="width:120px" placeholder="quem" value="'+esc(a.quem||"")+'">' +
+    '<input class="rv-a-d" type="date" style="width:135px" value="'+esc(a.quando||"")+'">' +
+    '<button class="rv-del" title="Remover">×</button></div>';
+}
+function renderRevisao(m){
+  var quadros = [["forcas","Forças"],["fraquezas","Fraquezas"],["oportunidades","Oportunidades"],["ameacas","Ameaças"]];
+  var h = '';
+  h += '<div class="rv-card"><span class="rv-tag">✦ Leitura do Conselheiro</span>' +
+       '<div style="font-size:13.5px;line-height:1.6">'+esc(m.leitura)+'</div></div>';
+  h += '<div class="rv-card" id="rvDir"><span class="rv-tag">✦ Direção estratégica</span>' +
+       '<span class="rv-lbl">Propósito</span><textarea data-dir="proposito">'+esc(m.direcao.proposito||"")+'</textarea>' +
+       '<span class="rv-lbl">Valores (um por linha)</span><textarea data-dir="valores">'+esc((m.direcao.valores||[]).join("\n"))+'</textarea>' +
+       '<span class="rv-lbl">Visão 3–5 anos</span><textarea data-dir="visao">'+esc(m.direcao.visao||"")+'</textarea>' +
+       '<span class="rv-lbl">Sonho grande (10+ anos)</span><textarea data-dir="objetivo_lp">'+esc(m.direcao.objetivo_lp||"")+'</textarea>' +
+       '<span class="rv-lbl">Competência central</span><input data-dir="competencia" style="width:100%" value="'+esc(m.direcao.competencia||"")+'">' +
+       '</div>';
+  h += '<div class="rv-card" id="rvSwot"><span class="rv-tag">✦ Diagnóstico — SWOT</span><div class="rv-grid2">';
+  quadros.forEach(function(q){
+    h += '<div data-quad="'+q[0]+'"><span class="rv-lbl">'+q[1]+'</span>' +
+         (m.swot[q[0]]||[]).map(rvSwotRow).join("") +
+         '<button class="rv-add" data-add-swot="'+q[0]+'">+ adicionar</button></div>';
+  });
+  h += '</div></div>';
+  h += '<div class="rv-card" id="rvOkrs"><span class="rv-tag">✦ Metas do ano — OKRs</span>';
+  (m.okrs||[]).forEach(function(o, i){
+    h += '<div class="rv-okr" data-okr-idx="'+i+'" style="margin-top:'+(i?14:2)+'px">' +
+         '<div class="rv-row"><b style="color:var(--muted);font-size:12px;flex:none">O'+(i+1)+'</b>' +
+         '<input class="rv-obj" style="flex:1;font-weight:600" value="'+esc(o.objetivo)+'">' +
+         '<button class="rv-del rv-del-okr" title="Remover objetivo">×</button></div>' +
+         (o.krs||[]).map(rvKrRow).join("") +
+         '<button class="rv-add" data-add-kr>+ resultado-chave (número e meta)</button></div>';
+  });
+  h += '</div>';
+  h += '<div class="rv-card" id="rvInic"><span class="rv-tag">✦ Plano de ataque — iniciativas e ações</span>';
+  (m.iniciativas||[]).forEach(function(ini, i){
+    h += '<div class="rv-ini" data-oidx="'+(ini.objetivo_idx==null?"":ini.objetivo_idx)+'" style="margin-top:'+(i?14:2)+'px">' +
+         '<div class="rv-row"><input class="rv-ini-n" style="flex:1;font-weight:600" value="'+esc(ini.nome)+'">' +
+         '<button class="rv-del rv-del-ini" title="Remover iniciativa">×</button></div>' +
+         (ini.acoes||[]).map(rvAcaoRow).join("") + '</div>';
+  });
+  h += '</div>';
+  el("onbRevCards").innerHTML = h;
+  el("onbRevErr").textContent = "";
+  el("onbAprovar").disabled = false;
+}
+function lerRevisao(){
+  var m = {leitura: (ONB.modelo && ONB.modelo.leitura) || "", direcao:{}, swot:{}, okrs:[], iniciativas:[]};
+  qsa("#rvDir [data-dir]").forEach(function(f){
+    var k = f.getAttribute("data-dir"), v = f.value.trim();
+    if(k === "valores"){
+      m.direcao[k] = v ? v.split("\n").map(function(s){return s.trim();}).filter(Boolean) : [];
+    } else m.direcao[k] = v || null;
+  });
+  ["forcas","fraquezas","oportunidades","ameacas"].forEach(function(q){
+    m.swot[q] = qsa('#rvSwot [data-quad="'+q+'"] input').map(function(i){return i.value.trim();}).filter(Boolean);
+  });
+  var okrIdxMap = {};   // índice original (data-okr-idx) → índice no array m.okrs já compactado
+  qsa("#rvOkrs .rv-okr").forEach(function(card){
+    var obj = card.querySelector(".rv-obj").value.trim();
+    if(!obj) return;
+    var krs = [];
+    qsa(".rv-kr", card).forEach(function(row){
+      var t = row.querySelector(".rv-kr-t").value.trim();
+      var mv = parseFloat(row.querySelector(".rv-kr-m").value);
+      if(!t || !isFinite(mv)) return;
+      var extra = {};
+      try{ extra = JSON.parse(decodeURIComponent(row.getAttribute("data-extra")||"")) || {}; }catch(e){}
+      krs.push({titulo:t, meta:mv, unidade: row.querySelector(".rv-kr-u").value.trim() || null,
+                base: (extra.base==null?null:extra.base), direcao: extra.direcao==="down"?"down":"up"});
+    });
+    okrIdxMap[card.getAttribute("data-okr-idx")] = m.okrs.length;
+    m.okrs.push({objetivo:obj, periodo:String(new Date().getFullYear()), krs:krs});
+  });
+  qsa("#rvInic .rv-ini").forEach(function(card){
+    var nome = card.querySelector(".rv-ini-n").value.trim();
+    if(!nome) return;
+    var oidx = card.getAttribute("data-oidx");
+    var acoes = [];
+    qsa(".rv-acao", card).forEach(function(row){
+      var oque = row.querySelector(".rv-a-o").value.trim();
+      if(!oque) return;
+      var extra = {};
+      try{ extra = JSON.parse(decodeURIComponent(row.getAttribute("data-extra")||"")) || {}; }catch(e){}
+      acoes.push({oque:oque, quem: row.querySelector(".rv-a-q").value.trim() || null,
+                  quando: row.querySelector(".rv-a-d").value || null,
+                  porque: extra.porque||null, onde: extra.onde||null,
+                  como: extra.como||null, quanto: (extra.quanto==null?null:extra.quanto)});
+    });
+    m.iniciativas.push({nome:nome,
+      objetivo_idx: okrIdxMap.hasOwnProperty(oidx) ? okrIdxMap[oidx] : null,
+      acoes:acoes});
+  });
+  return m;
+}
+async function onbAprovar(){
+  var m = lerRevisao();
+  if(!m.okrs.length){ el("onbRevErr").textContent = "Mantenha pelo menos uma meta (OKR)."; return; }
+  el("onbAprovar").disabled = true;
+  el("onbRevErr").textContent = "Criando seu painel…";
+  try{
+    var r = await jsend("POST","/onboarding/confirmar", m);
+    ONB.confirmado = true;
+    await sairOnboarding();
+    if(r && r.ja_tinha_plano){
+      setStatus("Você já tinha começado seu plano no painel — mantivemos tudo do jeito que está e encerramos o onboarding.", "info");
+    }else{
+      setStatus("Pronto! Seu primeiro plano está no painel: direção, diagnóstico, metas e ações — tudo continua editável. Quando quiser começar a medir, importe seus dados de venda.", "info");
+    }
+  }catch(e){
+    el("onbRevErr").textContent = "Não deu: " + e.message;
+    el("onbAprovar").disabled = false;
+  }
+}
+function renderTrialBar(t){
+  var bar = el("trialBar");
+  if(!t || t.status !== "trial" || !t.trial_expira_em){ bar.classList.add("hide"); return; }
+  var dias = Math.ceil((new Date(t.trial_expira_em).getTime() - Date.now()) / 86400000);
+  bar.innerHTML = dias <= 0
+    ? 'Teste grátis <b>encerrado</b> — fale com a gente para ativar seu plano e continuar.'
+    : 'Teste grátis · <b>' + dias + (dias === 1 ? " dia restante" : " dias restantes") +
+      '</b> — gostou? Fale com a gente para ativar seu plano.';
+  bar.style.background = dias <= 3 ? "var(--warn-soft)" : "var(--surface-2)";
+  bar.classList.remove("hide");
+}
+el("onbAnt").addEventListener("click", function(){ if(ONB.idx>0){ ONB.idx--; renderOnbPergunta(); } });
+el("onbSalvar").addEventListener("click", function(){ onbAvancar(false); });
+el("onbPular").addEventListener("click", function(){ onbAvancar(true); });
+el("onbDepois").addEventListener("click", function(ev){ ev.preventDefault(); sairOnboarding(); });
+el("onbAprovar").addEventListener("click", onbAprovar);
+el("onbRegerar").addEventListener("click", gerarModelo);
+el("onbRevCards").addEventListener("click", function(ev){
+  var t = ev.target;
+  if(t.classList.contains("rv-del-okr")){ t.closest(".rv-okr").remove(); return; }
+  if(t.classList.contains("rv-del-ini")){ t.closest(".rv-ini").remove(); return; }
+  if(t.classList.contains("rv-del")){ var row = t.closest(".rv-row"); if(row) row.remove(); return; }
+  if(t.hasAttribute("data-add-swot")){
+    if(qsa(".rv-row", t.parentElement).length >= 6){
+      el("onbRevErr").textContent = "Máximo de 6 itens por quadrante no plano inicial — edite ou remova um para trocar.";
+      return;
+    }
+    t.insertAdjacentHTML("beforebegin", rvSwotRow("")); return;
+  }
+  if(t.hasAttribute("data-add-kr")){
+    if(qsa(".rv-kr", t.closest(".rv-okr")).length >= 4){
+      el("onbRevErr").textContent = "Máximo de 4 resultados-chave por objetivo no plano inicial — remova um para adicionar outro.";
+      return;
+    }
+    t.insertAdjacentHTML("beforebegin", rvKrRow({titulo:"", meta:null, unidade:""})); return;
+  }
+});
 
 async function entrar(){
   var email = el("email").value.trim(), senha = el("senha").value;
@@ -3233,6 +3668,7 @@ async function enterApp(papel, tenant, nomeUsuario){
   var emp = el("empresa");
   el("tabAdmin").classList.toggle("hide", papel !== "super_admin");
   if(papel === "super_admin"){
+    el("trialBar").classList.add("hide");
     showApp("Administração da Plataforma");
     emp.classList.remove("hide");
     emp.innerHTML = '<option value="">— carregando empresas… —</option>';
@@ -3240,7 +3676,14 @@ async function enterApp(papel, tenant, nomeUsuario){
     setStatus("Você é <b>admin da plataforma</b>: escolha a empresa para navegar a base dela, ou abra a aba <b>Admin</b>.", "info");
   } else {
     emp.classList.add("hide");
+    ME_ONBOARDING = tenant ? tenant.onboarding : null;
+    if(tenant && tenant.onboarding === "pendente" &&
+       (papel === "admin_tenant" || papel === "estrategico")){
+      enterOnboarding(tenant);
+      return;
+    }
     showApp(tenant ? tenant.nome : "—");
+    renderTrialBar(tenant);
     load();
   }
 }
@@ -3253,6 +3696,11 @@ async function boot(){
 
 el("entrar").addEventListener("click", entrar);
 el("voltarSite").addEventListener("click", function(ev){ ev.preventDefault(); mostrarPortal(); });
+el("voltarSiteCad").addEventListener("click", function(ev){ ev.preventDefault(); mostrarPortal(); });
+el("irCadastro").addEventListener("click", function(ev){ ev.preventDefault(); mostrarCadastro(); });
+el("irLogin").addEventListener("click", function(ev){ ev.preventDefault(); mostrarCred(); });
+el("cadCriar").addEventListener("click", cadastrar);
+el("cadSenha").addEventListener("keydown", function(e){ if(e.key==="Enter") cadastrar(); });
 el("senha").addEventListener("keydown", function(e){ if(e.key==="Enter") entrar(); });
 el("logout").addEventListener("click", function(){ el("empresa").classList.add("hide"); logout(); });
 el("load").addEventListener("click", load);
