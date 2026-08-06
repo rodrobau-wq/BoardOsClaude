@@ -52,14 +52,5 @@ services:
         source: /*
         destination: /index.html
 
-  # Site de produto (landing pública, static site, free).
-  - type: web
-    name: boardos-site
-    runtime: static
-    branch: main
-    buildCommand: echo "sem build (HTML estático)"
-    staticPublishPath: ./site
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+  # A landing pública ("Portal do produto") vive dentro do próprio painel
+  # (div #portal em web/index.html), antes do login — não há mais site separado.

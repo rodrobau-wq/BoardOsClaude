@@ -26,7 +26,7 @@
 | Calendário | **Feriados e datas sazonais** por rede, alimentando o Advisor (3.4 ✅) |
 | Storytelling | **Navegação narrativa**: Hoje / Conselho / Estratégia (4 passos) / Execução / Configurações + checklist "Comece por aqui" ✅ |
 | Conselho | **Conselho BoardOS**: 5 conselheiros (Estratégia, Categorias, Trade & Indústria/JBP, Clientes/CRM, Novas Receitas/Retail Media) com pauta calculada dos dados reais + chat por persona ✅ |
-| Comercial | **Site de produto** no ar — boardos-site.onrender.com (4.5 ✅) |
+| Comercial | **Landing pública** dentro do painel (antes do login), com planos e cadastro self-service (4.5 ✅) |
 | Deploy | Render (API + painel + Postgres pago), GitHub CI por push |
 | CRM | Conector com layout assumido + onboarding demo (aguarda amostra real) |
 
