@@ -590,28 +590,29 @@
   </div>
   <nav class="tabs" id="tabs">
     <div class="grp">Visão</div>
-    <button class="tab on" data-tab="hoje"><span class="ico">◧</span> Dashboard</button>
-    <button class="tab" data-tab="indicadores"><span class="ico">▤</span> PIs — Indicadores</button>
+    <button class="tab on" data-tab="hoje"><span class="ico">◧</span> Dashboard Executivo</button>
+    <button class="tab" data-tab="dre"><span class="ico">▦</span> Resultado — DRE</button>
+    <button class="tab" data-tab="simulador"><span class="ico">△</span> Simulador de Resultado</button>
+    <button class="tab" data-tab="meupainel"><span class="ico">▢</span> Meu Painel</button>
     <button class="tab" data-tab="evolucao"><span class="ico">∿</span> Evolução</button>
-    <button class="tab" data-tab="dre"><span class="ico">Σ</span> Resultado — DRE</button>
     <div class="grp">Direção</div>
     <button class="tab" data-tab="estrategia"><span class="ico">◎</span> Estratégia</button>
-    <button class="tab" data-tab="okrs"><span class="ico">⊚</span> OKRs</button>
-    <button class="tab" data-tab="projetos"><span class="ico">▧</span> Projetos</button>
+    <button class="tab" data-tab="okrs"><span class="ico">⛳</span> OKRs</button>
+    <button class="tab" data-tab="indicadores"><span class="ico">▦</span> PIs — Indicadores</button>
     <div class="grp">Execução</div>
-    <button class="tab" data-tab="execucao"><span class="ico">⟳</span> FCAs e Fatos</button>
-    <button class="tab" data-tab="salaconselho"><span class="ico">▦</span> Reuniões</button>
-    <button class="tab" data-tab="importacao"><span class="ico">⇪</span> Importação de dados</button>
+    <button class="tab" data-tab="execucao"><span class="ico">⚡</span> FCAs &amp; Fatos<span id="badgeFca" class="nbadge hide"></span></button>
+    <button class="tab" data-tab="projetos"><span class="ico">▤</span> Projetos</button>
+    <button class="tab" data-tab="salaconselho"><span class="ico">◷</span> Reuniões</button>
     <div class="grp">Pessoas</div>
-    <button class="tab" data-tab="rv"><span class="ico">◈</span> Remuneração Variável</button>
     <button class="tab" data-tab="performance"><span class="ico">◔</span> Performance</button>
-    <button class="tab" data-tab="meupainel"><span class="ico">▣</span> Meu Painel</button>
+    <button class="tab" data-tab="rv"><span class="ico">◈</span> Remuneração Variável</button>
     <div class="grp">Inteligência</div>
     <button class="tab" data-tab="conselho"><span class="ico" style="color:var(--ia)">✦</span> Conselheiro IA</button>
     <button class="tab" data-tab="mercado"><span class="ico">◍</span> Mercado</button>
     <button class="tab" data-tab="noticias"><span class="ico">≡</span> Notícias</button>
     <div class="grp">Administração</div>
     <button class="tab" data-tab="admtenant"><span class="ico">⚙</span> Administração</button>
+    <button class="tab" data-tab="importacao"><span class="ico">⇪</span> Importação de dados</button>
     <button class="tab" data-tab="config"><span class="ico">⌖</span> Minha Rede</button>
     <button class="tab hide" data-tab="admin" id="tabAdmin"><span class="ico">▥</span> BoardOS Control</button>
   </nav>
@@ -1847,9 +1848,10 @@ var VIEW_TITLES = {hoje:"Dashboard Executivo", evolucao:"Evolução dos Indicado
   okrs:"OKRs", projetos:"Projetos estratégicos", importacao:"Importação de dados",
   admtenant:"Administração do tenant", dre:"Resultado — DRE",
   rv:"Remuneração Variável", performance:"Avaliação de Performance",
-  meupainel:"Meu Painel", mercado:"Mercado", noticias:"Notícias"};
+  meupainel:"Meu Painel", mercado:"Mercado", noticias:"Notícias",
+  simulador:"Simulador de Resultado"};
 // telas do protótipo que chegam nas próximas fases → Em construção
-var STUBS = {dre:1, rv:1, performance:1, meupainel:1, mercado:1, noticias:1};
+var STUBS = {dre:1, simulador:1, rv:1, performance:1, meupainel:1, mercado:1, noticias:1};
 // atalhos: itens de menu que abrem telas existentes já na vista certa
 var ALIAS = {okrs:   {real:"estrategia", depois:function(){ showPlanTab("metas"); }},
              projetos:{real:"estrategia", depois:function(){ showPlanTab("tatico"); }},
@@ -2163,6 +2165,7 @@ async function refreshLojas(){
   try{
     var r = await jget("/lojas");
     lojasCache = r.lojas || [];
+    renderMarca();
     var tb = el("lojasCfgTbl").querySelector("tbody");
     tb.innerHTML = lojasCache.map(function(l, i){
       var pop = l.populacao ? (l.populacao >= 1000000 ? (l.populacao/1000000).toFixed(2)+" mi" : (l.populacao/1000).toFixed(0)+" mil") : "—";
@@ -2494,6 +2497,13 @@ var FCA_V2 = {aberto:{txt:"AGUARDANDO APROVAÇÃO", cls:"pr"},
   descartado:{txt:"DESCARTADO", cls:"hint"}};
 function renderFca(ciclos){
   fcaCache = ciclos || [];
+  // contador no menu: FCAs que ainda pedem ação (aberto + em andamento)
+  var abertas = fcaCache.filter(function(c){
+    return c.status === "aberto" || c.status === "em_andamento";
+  }).length;
+  var bdg = el("badgeFca");
+  bdg.textContent = abertas;
+  bdg.classList.toggle("hide", !abertas);
   var cols = [
     {t:"Aberto", itens:[]}, {t:"Em ação", itens:[]},
     {t:"Validação", itens:[]}, {t:"Concluído", itens:[]}
@@ -3218,8 +3228,16 @@ function showApp(tenantNome){
   el("cfg").classList.remove("hide");
   el("sidebar").classList.remove("hide");
   renderCicloPill();
-  el("tenantNome").textContent = tenantNome;
+  TENANT_NOME = tenantNome;
+  renderMarca();
   el("viewTitle").textContent = VIEW_TITLES[TAB] || "BoardOS";
+}
+var TENANT_NOME = "";
+/* marca da sidebar: rede · nº de lojas (o protótipo mostra "… · 14 lojas") */
+function renderMarca(){
+  var n = lojasCache.length;
+  el("tenantNome").textContent = TENANT_NOME +
+    (n ? " · " + n + (n === 1 ? " loja" : " lojas") : "");
 }
 function setUsuario(nome, papel){
   var n = nome || "—";
@@ -3681,6 +3699,8 @@ async function enterApp(papel, tenant, nomeUsuario){
     }
     showApp(tenant ? tenant.nome : "—");
     renderTrialBar(tenant);
+    // conta as lojas já na entrada, para a marca da sidebar sair completa
+    jget("/lojas").then(function(r){ lojasCache = r.lojas || []; renderMarca(); }).catch(function(){});
     load();
   }
 }
@@ -4553,7 +4573,7 @@ function mandarLojasAoMapa(){
 }
 function renderRede(){
   if(!lojasCache.length){
-    jget("/lojas").then(function(r){ lojasCache = r.lojas || []; renderRede(); }).catch(function(){});
+    jget("/lojas").then(function(r){ lojasCache = r.lojas || []; renderMarca(); renderRede(); }).catch(function(){});
   }
   el("redeLojasLista").innerHTML = lojasCache.length
     ? lojasCache.map(function(l, i){
@@ -4724,7 +4744,7 @@ var fatoSel = {loja:null, tags:[]}, fatoId = null;
 function abrirFato(){
   fatoSel = {loja:null, tags:[]}; fatoId = null;
   if(!lojasCache.length){
-    jget("/lojas").then(function(r){ lojasCache = r.lojas || []; abrirFato(); }).catch(function(){});
+    jget("/lojas").then(function(r){ lojasCache = r.lojas || []; renderMarca(); abrirFato(); }).catch(function(){});
   }
   el("fatoTexto").value = "";
   el("fatoPasso1").classList.remove("hide");
