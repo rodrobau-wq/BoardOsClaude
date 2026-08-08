@@ -387,6 +387,33 @@ def tenant_delete(tid2: str, user: dict = Depends(current)):
     return {"ok": True}
 
 
+class SeedDemoIn(BaseModel):
+    apagar_existentes: bool = False
+    senha: Optional[str] = None
+
+
+@app.post("/admin/seed-demo")
+def admin_seed_demo(body: SeedDemoIn, user: dict = Depends(current)):
+    """Popula o banco com as 4 redes de demonstração (perfis médio/bom/ruim/misto).
+
+    Só o super-admin. Com apagar_existentes=true, remove TODAS as demais
+    empresas e seus dados em cascata — irreversível.
+    """
+    _super(user)
+    if body.senha is not None and len(body.senha) < 8:
+        raise HTTPException(400, "Senha dos logins demo: mínimo 8 caracteres.")
+    import importlib.util
+    caminho = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                           "scripts", "seed_redes_demo.py")
+    spec = importlib.util.spec_from_file_location("seed_redes_demo", caminho)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    linhas_log = []
+    resumo = mod.semear(apagar_existentes=body.apagar_existentes,
+                        senha=body.senha, log=linhas_log.append)
+    return {"ok": True, "resumo": resumo, "log": linhas_log}
+
+
 @app.get("/admin/metricas")
 def admin_metricas(user: dict = Depends(current)):
     """Métricas da plataforma: por empresa (usuários, uso do mês, receita

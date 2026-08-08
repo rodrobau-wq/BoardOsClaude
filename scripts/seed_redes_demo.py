@@ -118,15 +118,19 @@ def fator_dia(d: date, sazon: float) -> float:
 
 
 def gerar_gold(rede, loja_ids, cat_ids, rnd):
-    """Uma linha por loja/dia (total) + uma por loja/dia/categoria."""
+    """Uma linha por loja/dia (total, período inteiro) + o detalhe por categoria
+    nos últimos 12 meses — que é o que o drill-down usa. Gerar categoria em
+    todo o histórico triplicaria o volume sem ninguém olhar."""
     linhas = []
     dias = (ATE - DE).days + 1
+    cat_desde = ATE - timedelta(days=365)
     for i in range(dias):
         d = DE + timedelta(days=i)
         anos = i / 365.0
         base = rede["fat_loja_dia"] * ((1 + rede["cresc"]) ** anos)
         margem_pct = rede["margem"] + rede["margem_drift"] * anos
         margem_pct = max(0.06, min(0.42, margem_pct))
+        com_categoria = d >= cat_desde
         for lid in loja_ids:
             porte = 0.72 + (hash(lid) % 60) / 100.0        # cada loja tem seu porte
             fat = base * porte * fator_dia(d, rede["sazon"]) * rnd.uniform(0.94, 1.06)
@@ -136,6 +140,8 @@ def gerar_gold(rede, loja_ids, cat_ids, rnd):
             margem = round(fat * margem_pct, 2)
             linhas.append((d, lid, None, round(fat * 1.06, 2), fat,
                            round(fat - margem, 2), margem, itens, cupons, float(itens)))
+            if not com_categoria:
+                continue
             for (cod, _nome, _sec, peso) in CATEGORIAS:
                 pc = peso * rnd.uniform(0.9, 1.1)
                 fc = round(fat * pc, 2)
@@ -346,28 +352,28 @@ def semear_tenant(cur, tid, rede):
                     (tid, chave, nome, pilar, jornada, dirn, metas.get(chave), ordem))
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--apagar-existentes", action="store_true",
-                    help="APAGA todas as outras empresas do banco (irreversível)")
-    ap.add_argument("--senha", help="se informada, cria um login admin por rede")
-    a = ap.parse_args()
+def semear(apagar_existentes=False, senha=None, log=print):
+    """Cria/atualiza as 4 redes. Devolve o resumo do que foi feito.
 
+    Chamável da API (POST /admin/seed-demo) e da linha de comando.
+    """
+    resumo = {"redes": [], "apagadas": [], "calendario": 0}
     rnd = random.Random(20260808)
     os.environ.setdefault("BOARDOS_DSN", ADMIN_DSN)
     from boardos.db import tenant_session  # noqa: E402  (depois do BOARDOS_DSN)
 
     slugs = [r["slug"] for r in REDES]
     with psycopg.connect(ADMIN_DSN, autocommit=True) as conn:
-        if a.apagar_existentes:
+        if apagar_existentes:
             outros = conn.execute(
                 "SELECT nome FROM platform.tenant WHERE slug <> ALL(%s)", (slugs,)).fetchall()
+            resumo["apagadas"] = [o[0] for o in outros]
             if outros:
-                print("APAGANDO as empresas: " + ", ".join(o[0] for o in outros))
+                log("APAGANDO as empresas: " + ", ".join(resumo["apagadas"]))
             conn.execute("DELETE FROM platform.tenant WHERE slug <> ALL(%s)", (slugs,))
         with conn.cursor() as cur:
-            dias_cal = upsert_into(cur, DE, date(ATE.year + 1, 12, 31))
-        print(f"calendário: {dias_cal} dias\n")
+            resumo["calendario"] = upsert_into(cur, DE, date(ATE.year + 1, 12, 31))
+        log(f"calendário: {resumo['calendario']} dias\n")
 
         for rede in REDES:
             tid = conn.execute(
@@ -377,13 +383,13 @@ def main():
                 (rede["nome"], rede["slug"])).fetchone()[0]
             conn.execute("INSERT INTO platform.assinatura (tenant_id, plano, base_mensal_cent, preco_por_1k_cent) "
                          "VALUES (%s,'v0',49900,900) ON CONFLICT (tenant_id) DO NOTHING", (tid,))
-            if a.senha:
+            if senha:
                 email = rede["slug"].replace("rede-", "") + "@boardos.demo"
                 conn.execute(
                     "INSERT INTO platform.usuario_login (email, senha_hash, nome, tenant_id, papel) "
                     "VALUES (%s,%s,%s,%s,'admin_tenant') ON CONFLICT (email) DO UPDATE SET "
                     "senha_hash=EXCLUDED.senha_hash, tenant_id=EXCLUDED.tenant_id",
-                    (email, hash_password(a.senha), "Dono " + rede["nome"], tid))
+                    (email, hash_password(senha), "Dono " + rede["nome"], tid))
 
             with tenant_session(str(tid)) as cur:
                 # limpa o conteúdo antes de resemear (reexecução idempotente)
@@ -418,9 +424,21 @@ def main():
                     [(str(tid),) + l for l in linhas])
                 semear_tenant(cur, str(tid), rede)
 
-            print(f"{rede['nome']:<26} perfil={rede['perfil']:<7} "
-                  f"{len(rede['lojas'])} lojas · {len(linhas):>7} linhas de venda · id={tid}")
+            resumo["redes"].append({"nome": rede["nome"], "perfil": rede["perfil"],
+                                    "id": str(tid), "lojas": len(rede["lojas"]),
+                                    "linhas": len(linhas)})
+            log(f"{rede['nome']:<26} perfil={rede['perfil']:<7} "
+                f"{len(rede['lojas'])} lojas · {len(linhas):>7} linhas de venda · id={tid}")
+    return resumo
 
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--apagar-existentes", action="store_true",
+                    help="APAGA todas as outras empresas do banco (irreversível)")
+    ap.add_argument("--senha", help="se informada, cria um login admin por rede")
+    a = ap.parse_args()
+    semear(apagar_existentes=a.apagar_existentes, senha=a.senha)
     print("\nPronto. Entre como super-admin e escolha a empresa no seletor do topo.")
     if a.senha:
         print("Logins criados: " + ", ".join(r["slug"].replace("rede-", "") + "@boardos.demo"

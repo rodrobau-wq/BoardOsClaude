@@ -1001,6 +1001,7 @@
     <div class="kpis" id="admKpis" style="margin-bottom:16px"></div>
     <section class="card">
       <header><h2>Clientes da plataforma</h2>
+        <button class="btn ghost" id="seedDemo" style="padding:6px 12px;font-size:12.5px">Popular 4 redes demo</button>
         <button class="btn ghost" id="cliAdd" style="padding:6px 12px;font-size:12.5px">＋ Cliente</button>
       </header>
       <div class="body" style="overflow-x:auto">
@@ -3761,6 +3762,28 @@ el("tabs").addEventListener("click", function(e){
   showTab(b.getAttribute("data-tab"));
 });
 el("cliAdd").addEventListener("click", function(){ editorCliente(null, el("cliAdd").closest("header")); });
+el("seedDemo").addEventListener("click", function(){
+  openEditor(el("seedDemo").closest("header"), [
+    {k:"apagar", label:"Apagar as demais empresas", type:"select", value:"nao",
+     options:[["nao","Não — só cria/atualiza as 4 redes"],
+              ["sim","SIM — apaga todas as outras e seus dados (irreversível)"]]},
+    {k:"senha", label:"Senha dos logins demo (vazio = não criar login)",
+     cls:"w-lg", ph:"mínimo 8 caracteres"}
+  ], async function(i){
+    var apagar = i.apagar.value === "sim";
+    var senha = i.senha.value.trim();
+    if(senha && senha.length < 8) throw new Error("Senha: mínimo 8 caracteres.");
+    if(apagar && !confirm("Isto APAGA todas as empresas que não são as 4 redes demo, "+
+        "com todos os seus dados, sem desfazer.\n\nConfirma?")) throw new Error("cancelado");
+    setStatus("Populando… leva um ou dois minutos (gera ~2 anos de venda por loja).", "info");
+    var r = await jsend("POST","/admin/seed-demo",
+                        {apagar_existentes: apagar, senha: senha || null});
+    var red = (r.resumo.redes||[]).map(function(x){ return x.nome+" ("+x.perfil+")"; }).join(" · ");
+    var apg = (r.resumo.apagadas||[]).length ? " Apagadas: "+r.resumo.apagadas.join(", ")+"." : "";
+    setStatus("Pronto: "+red+"."+apg+" Escolha a empresa no seletor do topo.", "info");
+    loadAdmin(); refreshEmpresaSelect();
+  }, "Popular");
+});
 el("cliTbl").addEventListener("click", function(e){
   var b = e.target.closest("button.ib"); if(!b) return;
   var c2 = cliCache[+b.getAttribute("data-ci")]; if(!c2) return;
